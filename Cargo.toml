@@ -42,17 +42,17 @@ dashmap = "6"
 arc-swap = "1"
 
 # scheduler
-cron = "0.15"
+cron = "0.17"
 
 # admin HTTP server (dbos-server)
 axum = "0.8"
 tower = "0.5"
-tower-http = { version = "0.6", features = ["trace"] }
+tower-http = { version = "0.7", features = ["trace"] }
 
 # conductor WebSocket client (dbos-server)
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
-rand = "0.9"
+rand = "0.10"
 
 # CLI (dbos-cli)
 clap = { version = "4", features = ["derive", "env"] }
