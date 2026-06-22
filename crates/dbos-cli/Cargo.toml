@@ -5,15 +5,19 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Command-line interface for DBOS Transact"
+homepage.workspace = true
+description = "Command-line interface for DBOS Transact (a Rust port of DBOS Transact)"
+keywords.workspace = true
+categories = ["command-line-utilities", "asynchronous"]
+readme = "README.md"
 
 [[bin]]
 name = "dbos"
 path = "src/main.rs"
 
 [dependencies]
-dbos-core = { path = "../dbos-core" }
-dbos-server = { path = "../dbos-server" }
+dbos-core = { path = "../dbos-core", version = "0.1.0" }
+dbos-server = { path = "../dbos-server", version = "0.1.0" }
 tokio.workspace = true
 clap.workspace = true
 anyhow.workspace = true

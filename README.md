@@ -1,6 +1,10 @@
-# DBOS Transact
+# DBOS Transact (Rust)
 
 Lightweight **durable workflow orchestration** on Postgres or SQLite.
+
+> A Rust port of [**DBOS Transact**](https://github.com/dbos-inc) — the durable-workflow platform by
+> [DBOS, Inc.](https://www.dbos.dev) This is an independent, community implementation; see
+> [Credits](#credits).
 
 DBOS makes ordinary `async` functions **durable**: their inputs, outputs, and each *step* are
 checkpointed in a database, so if your program crashes, each workflow automatically resumes from its
@@ -226,6 +230,16 @@ dbos workflow cancel <id>
 cargo test --workspace                                  # in-process SQLite, no services
 DBOS_TEST_DATABASE_URL=postgres://localhost cargo test -p dbos-core -- --test-threads=4   # against Postgres
 ```
+
+## Credits
+
+This is a Rust port of [DBOS Transact](https://github.com/dbos-inc), the durable-workflow platform
+created by [DBOS, Inc.](https://www.dbos.dev) The programming model — durable workflows, memoized
+steps, queues, scheduling, and notifications backed by Postgres — and the reference implementations
+([Go](https://github.com/dbos-inc/dbos-transact-golang),
+[Python](https://github.com/dbos-inc/dbos-transact-py),
+[TypeScript](https://github.com/dbos-inc/dbos-transact-ts)) are their work. This project is an
+independent Rust implementation and is not affiliated with or endorsed by DBOS, Inc.
 
 ## License
 

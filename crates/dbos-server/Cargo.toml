@@ -5,10 +5,14 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Admin HTTP server for DBOS Transact"
+homepage.workspace = true
+description = "Admin HTTP server and control-plane client for DBOS Transact (a Rust port of DBOS Transact)"
+keywords.workspace = true
+categories = ["asynchronous", "web-programming::http-server"]
+readme = "README.md"
 
 [dependencies]
-dbos-core = { path = "../dbos-core" }
+dbos-core = { path = "../dbos-core", version = "0.1.0" }
 tokio.workspace = true
 tokio-util.workspace = true
 axum.workspace = true

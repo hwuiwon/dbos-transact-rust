@@ -1,5 +1,7 @@
 # Architecture
 
+> A Rust port of [DBOS Transact](https://github.com/dbos-inc) by [DBOS, Inc.](https://www.dbos.dev)
+
 DBOS Transact makes ordinary async Rust functions **durable**: a workflow's input, its output, and
 each memoized *step* are checkpointed in a system database, so after a crash the workflow resumes
 from its last completed step with exactly-once side-effect semantics.
