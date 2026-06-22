@@ -26,7 +26,6 @@ use std::time::Duration;
 
 use dbos::DbosContext;
 use futures_util::{SinkExt, StreamExt};
-use rand::Rng;
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, MissedTickBehavior};
@@ -269,7 +268,7 @@ fn next_backoff(current: Duration) -> Duration {
 
 /// Apply [0.5, 1.5) multiplicative jitter to a backoff duration.
 fn with_jitter(wait: Duration) -> Duration {
-    let factor = 0.5 + rand::rng().random::<f64>();
+    let factor = 0.5 + rand::random::<f64>();
     wait.mul_f64(factor)
 }
 
