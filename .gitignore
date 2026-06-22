@@ -1,0 +1,16 @@
+/target
+**/*.rs.bk
+Cargo.lock.orig
+*.pdb
+
+# Local test databases
+*.sqlite
+*.sqlite3
+*.db
+dbos.sqlite*
+
+# Env / editor
+.env
+.DS_Store
+.idea/
+.vscode/

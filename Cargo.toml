@@ -1,0 +1,65 @@
+[workspace]
+resolver = "3"
+members = ["crates/dbos-core", "crates/dbos-server", "crates/dbos-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/hwuiwon/dbos-transact-rust"
+description = "Lightweight durable workflow orchestration on Postgres/SQLite"
+
+[workspace.dependencies]
+# async runtime & structured concurrency
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+futures = "0.3"
+
+# database
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio", "tls-rustls", "postgres", "sqlite", "macros", "migrate", "json", "chrono", "uuid",
+] }
+
+# serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+
+# errors / logging / ids / time
+thiserror = "2"
+async-trait = "0.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["clock", "serde"] }
+
+# concurrent maps & read-mostly state
+dashmap = "6"
+arc-swap = "1"
+
+# scheduler
+cron = "0.15"
+
+# admin HTTP server (dbos-server)
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace"] }
+
+# conductor WebSocket client (dbos-server)
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+rand = "0.9"
+
+# CLI (dbos-cli)
+clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"
+
+# HTTP client (CLI + server tests)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# dev
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
