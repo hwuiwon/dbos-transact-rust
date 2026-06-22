@@ -52,15 +52,15 @@ pub mod serialization;
 mod util;
 pub mod workflow;
 
+pub use client::{Client, ClientConfig, EnqueueOptions};
 pub use config::Config;
 pub use constants::DEFAULT_MAX_RECOVERY_ATTEMPTS;
-pub use debouncer::Debouncer;
 pub use context::lifecycle::new_context;
 pub use context::{DbosContext, StepCtx, WfCtx};
-pub use client::{Client, ClientConfig, EnqueueOptions};
 pub use db::{
     ForkInput, ListWorkflowsInput, StepInfo, SystemDatabase, WorkflowStatus, WorkflowStatusType,
 };
+pub use debouncer::Debouncer;
 pub use error::{DbosError, DbosErrorCode, DbosResult, PortableWorkflowError};
 pub use queue::{QueueOptions, RateLimiter, WorkflowQueue, register_queue};
 pub use recovery::recover_pending_workflows;
@@ -74,9 +74,10 @@ pub use workflow::comms::{get_event, read_stream, send};
 pub use workflow::handle::WorkflowHandle;
 pub use workflow::manage::{
     ForkOptions, cancel_workflow, delete_workflow, fork_workflow, garbage_collect_workflows,
-    get_step_aggregates, get_workflow_events, get_workflow_notifications, get_workflow_status_counts,
-    get_workflow_steps, get_workflow_streams, list_application_versions, list_registered_queues,
-    list_workflows, resume_workflow, retrieve_workflow, set_latest_application_version,
+    get_step_aggregates, get_workflow_events, get_workflow_notifications,
+    get_workflow_status_counts, get_workflow_steps, get_workflow_streams,
+    list_application_versions, list_registered_queues, list_workflows, resume_workflow,
+    retrieve_workflow, set_latest_application_version,
 };
 pub use workflow::run::run_workflow;
 pub use workflow::step::StepOptions;

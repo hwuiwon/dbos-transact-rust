@@ -17,12 +17,13 @@ use dbos::{
     DbosContext, ForkOptions, ListWorkflowsInput, StepInfo, WorkflowQueue, WorkflowStatus,
     WorkflowStatusType, cancel_workflow, delete_workflow, fork_workflow, garbage_collect_workflows,
     get_schedule, get_step_aggregates, get_workflow_events, get_workflow_notifications,
-    get_workflow_status_counts, get_workflow_steps, get_workflow_streams, list_application_versions,
-    list_registered_queues, list_schedules, list_workflows, pause_schedule,
-    recover_pending_workflows, resume_schedule, resume_workflow, set_latest_application_version,
+    get_workflow_status_counts, get_workflow_steps, get_workflow_streams,
+    list_application_versions, list_registered_queues, list_schedules, list_workflows,
+    pause_schedule, recover_pending_workflows, resume_schedule, resume_workflow,
+    set_latest_application_version,
 };
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
 use super::protocol::{self as proto, BaseResponse, msg};
@@ -789,17 +790,15 @@ async fn handle_get_workflow_notifications(
         Ok(rows) => {
             let notifications = rows
                 .into_iter()
-                .map(
-                    |(topic, message, created_at_epoch_ms, _ser, consumed)| {
-                        proto::NotificationOutput {
-                            // An empty topic means it was sent without one => null.
-                            topic: non_empty(&topic),
-                            message: message.unwrap_or_default(),
-                            created_at_epoch_ms,
-                            consumed,
-                        }
-                    },
-                )
+                .map(|(topic, message, created_at_epoch_ms, _ser, consumed)| {
+                    proto::NotificationOutput {
+                        // An empty topic means it was sent without one => null.
+                        topic: non_empty(&topic),
+                        message: message.unwrap_or_default(),
+                        created_at_epoch_ms,
+                        consumed,
+                    }
+                })
                 .collect();
             marshal(&proto::GetWorkflowNotificationsResponse {
                 base: BaseResponse::ok(msg::GET_WORKFLOW_NOTIFICATIONS, request_id),
@@ -892,14 +891,16 @@ async fn handle_list_application_versions(
         Ok(rows) => {
             let output = rows
                 .into_iter()
-                .map(|(version_id, version_name, version_timestamp, created_at)| {
-                    proto::ApplicationVersionOutput {
-                        version_id,
-                        version_name,
-                        version_timestamp,
-                        created_at,
-                    }
-                })
+                .map(
+                    |(version_id, version_name, version_timestamp, created_at)| {
+                        proto::ApplicationVersionOutput {
+                            version_id,
+                            version_name,
+                            version_timestamp,
+                            created_at,
+                        }
+                    },
+                )
                 .collect();
             marshal(&proto::ListApplicationVersionsResponse {
                 base: BaseResponse::ok(msg::LIST_APPLICATION_VERSIONS, request_id),

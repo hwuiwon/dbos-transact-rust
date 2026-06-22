@@ -13,11 +13,17 @@ use futures::future::BoxFuture;
 // --- child workflows ---
 
 async fn child_wf(ctx: WfCtx, x: i32) -> Result<i32, DbosError> {
-    ctx.run_step("double", move |_s| async move { Ok::<i32, DbosError>(x * 2) }).await
+    ctx.run_step(
+        "double",
+        move |_s| async move { Ok::<i32, DbosError>(x * 2) },
+    )
+    .await
 }
 
 async fn parent_wf(ctx: WfCtx, x: i32) -> Result<i32, DbosError> {
-    let handle = ctx.run_child_workflow::<i32, i32>("child_wf", x, RunOptions::default()).await?;
+    let handle = ctx
+        .run_child_workflow::<i32, i32>("child_wf", x, RunOptions::default())
+        .await?;
     let r = handle.get_result().await?;
     Ok(r + 1)
 }
@@ -33,14 +39,22 @@ async fn child_workflow_runs_and_links_to_parent() {
         &ctx,
         "parent_wf",
         5,
-        RunOptions { workflow_id: Some("parent-1".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("parent-1".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
     assert_eq!(h.get_result().await.unwrap(), 11); // (5*2)+1
 
     // Deterministic child id `{parent}-{stepID}` with stepID 0.
-    let child = ctx.system_database().get_workflow_status("parent-1-0").await.unwrap().unwrap();
+    let child = ctx
+        .system_database()
+        .get_workflow_status("parent-1-0")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(child.name, "child_wf");
     assert_eq!(child.parent_workflow_id, "parent-1");
 
@@ -73,7 +87,10 @@ async fn child_workflow_replayed_on_recovery() {
         &ctx,
         "parent_wf",
         7,
-        RunOptions { workflow_id: Some("p-rec".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("p-rec".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
@@ -81,11 +98,19 @@ async fn child_workflow_replayed_on_recovery() {
     assert_eq!(runs.load(Ordering::SeqCst), 1);
 
     // Crash the parent and recover: child must be replayed, not re-executed.
-    ctx.system_database().set_workflow_status_pending("p-rec").await.unwrap();
-    let handles = dbos::recover_pending_workflows(&ctx, &["local"]).await.unwrap();
+    ctx.system_database()
+        .set_workflow_status_pending("p-rec")
+        .await
+        .unwrap();
+    let handles = dbos::recover_pending_workflows(&ctx, &["local"])
+        .await
+        .unwrap();
     // Only the parent is PENDING (child already SUCCESS).
     assert_eq!(handles.len(), 1);
-    assert_eq!(handles[0].get_result().await.unwrap(), serde_json::json!(15));
+    assert_eq!(
+        handles[0].get_result().await.unwrap(),
+        serde_json::json!(15)
+    );
     assert_eq!(runs.load(Ordering::SeqCst), 1);
 
     ctx.shutdown(Duration::from_secs(5)).await;
@@ -111,19 +136,33 @@ async fn durable_sleep_replays_remaining_time() {
         &ctx,
         "sleeper",
         300,
-        RunOptions { workflow_id: Some("sleep-1".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("sleep-1".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
     let first = h.get_result().await.unwrap();
-    assert!(first >= 250, "first run should sleep ~full duration, got {first}");
+    assert!(
+        first >= 250,
+        "first run should sleep ~full duration, got {first}"
+    );
     assert!(started.elapsed() >= Duration::from_millis(250));
 
     // After completion the wake time is in the past; recovery replays sleep as ~0.
-    ctx.system_database().set_workflow_status_pending("sleep-1").await.unwrap();
-    let handles = dbos::recover_pending_workflows(&ctx, &["local"]).await.unwrap();
+    ctx.system_database()
+        .set_workflow_status_pending("sleep-1")
+        .await
+        .unwrap();
+    let handles = dbos::recover_pending_workflows(&ctx, &["local"])
+        .await
+        .unwrap();
     let recovered = handles[0].get_result().await.unwrap().as_i64().unwrap();
-    assert!(recovered <= 50, "recovery should replay sleep as ~0, got {recovered}");
+    assert!(
+        recovered <= 50,
+        "recovery should replay sleep as ~0, got {recovered}"
+    );
 
     ctx.shutdown(Duration::from_secs(5)).await;
 }
@@ -154,7 +193,10 @@ fn flaky_step_wf(
                 async move {
                     let n = a.fetch_add(1, Ordering::SeqCst) as i32;
                     if n < fail_until {
-                        Err(DbosError::new(DbosErrorCode::StepExecution, format!("fail {n}")))
+                        Err(DbosError::new(
+                            DbosErrorCode::StepExecution,
+                            format!("fail {n}"),
+                        ))
                     } else {
                         Ok::<i32, DbosError>(n)
                     }
@@ -178,7 +220,9 @@ async fn step_retries_until_success() {
     ctx.launch().await.unwrap();
 
     // Fails for n in {0,1,2}, succeeds at n=3 -> 4 body runs, result 3.
-    let h = dbos::run_workflow::<i32, i32>(&ctx, "flaky", 3, RunOptions::default()).await.unwrap();
+    let h = dbos::run_workflow::<i32, i32>(&ctx, "flaky", 3, RunOptions::default())
+        .await
+        .unwrap();
     assert_eq!(h.get_result().await.unwrap(), 3);
     assert_eq!(attempts.load(Ordering::SeqCst), 4);
     ctx.shutdown(Duration::from_secs(5)).await;
@@ -197,9 +241,15 @@ async fn step_retries_exhausted() {
     ctx.launch().await.unwrap();
 
     // Always fails (fail_until huge); max_retries=2 -> 3 runs then exceeded.
-    let h = dbos::run_workflow::<i32, i32>(&ctx, "flaky", 999, RunOptions::default()).await.unwrap();
+    let h = dbos::run_workflow::<i32, i32>(&ctx, "flaky", 999, RunOptions::default())
+        .await
+        .unwrap();
     let err = h.get_result().await.unwrap_err();
-    assert!(err.message.contains("maximum of 2 retries"), "got: {}", err.message);
+    assert!(
+        err.message.contains("maximum of 2 retries"),
+        "got: {}",
+        err.message
+    );
     assert_eq!(attempts.load(Ordering::SeqCst), 3);
     ctx.shutdown(Duration::from_secs(5)).await;
 }
@@ -216,7 +266,9 @@ async fn retry_predicate_stops_early() {
     .unwrap();
     ctx.launch().await.unwrap();
 
-    let h = dbos::run_workflow::<i32, i32>(&ctx, "flaky", 999, RunOptions::default()).await.unwrap();
+    let h = dbos::run_workflow::<i32, i32>(&ctx, "flaky", 999, RunOptions::default())
+        .await
+        .unwrap();
     assert!(h.get_result().await.is_err());
     // Predicate returns false after the first failure -> only one run.
     assert_eq!(attempts.load(Ordering::SeqCst), 1);
@@ -236,7 +288,8 @@ async fn nondeterministic_step_name_is_detected() {
         Box::pin(async move {
             let first = !f.swap(true, Ordering::SeqCst);
             let name = if first { "step_a" } else { "step_b" };
-            ctx.run_step(name, |_s| async move { Ok::<i32, DbosError>(1) }).await
+            ctx.run_step(name, |_s| async move { Ok::<i32, DbosError>(1) })
+                .await
         }) as BoxFuture<'static, Result<i32, DbosError>>
     };
     dbos::register_workflow::<(), i32, _, _>(&ctx, "wf", wf).unwrap();
@@ -246,15 +299,23 @@ async fn nondeterministic_step_name_is_detected() {
         &ctx,
         "wf",
         (),
-        RunOptions { workflow_id: Some("det-1".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("det-1".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
     assert_eq!(h.get_result().await.unwrap(), 1);
 
     // Recover: the body now names the step differently at the same step id.
-    ctx.system_database().set_workflow_status_pending("det-1").await.unwrap();
-    let handles = dbos::recover_pending_workflows(&ctx, &["local"]).await.unwrap();
+    ctx.system_database()
+        .set_workflow_status_pending("det-1")
+        .await
+        .unwrap();
+    let handles = dbos::recover_pending_workflows(&ctx, &["local"])
+        .await
+        .unwrap();
     let err = handles[0].get_result().await.unwrap_err();
     assert!(
         err.message.contains("was recorded when") || err.message.contains("deterministic"),

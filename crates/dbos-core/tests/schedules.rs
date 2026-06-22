@@ -7,9 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use dbos::db::ListWorkflowsInput;
-use dbos::{
-    Config, CreateScheduleOptions, DbosContext, DbosError, ScheduledWorkflowInput, WfCtx,
-};
+use dbos::{Config, CreateScheduleOptions, DbosContext, DbosError, ScheduledWorkflowInput, WfCtx};
 use futures::future::BoxFuture;
 
 /// Build an unlaunched context with a short reconciler poll interval so dynamic
@@ -98,7 +96,11 @@ async fn dynamic_create_fires_then_delete_stops() {
         .unwrap();
     assert!(rows.len() >= 2);
     for r in &rows {
-        assert!(r.id.starts_with("sched-every_second-"), "unexpected id {}", r.id);
+        assert!(
+            r.id.starts_with("sched-every_second-"),
+            "unexpected id {}",
+            r.id
+        );
         assert_eq!(r.queue_name, "_dbos_internal_queue");
     }
 
@@ -113,7 +115,12 @@ async fn dynamic_create_fires_then_delete_stops() {
         "schedule kept firing after delete: {after_delete} -> {later}"
     );
 
-    assert!(dbos::get_schedule(&ctx, "every_second").await.unwrap().is_none());
+    assert!(
+        dbos::get_schedule(&ctx, "every_second")
+            .await
+            .unwrap()
+            .is_none()
+    );
     ctx.shutdown(Duration::from_secs(5)).await;
 }
 
@@ -150,7 +157,10 @@ async fn pause_stops_resume_restarts() {
     let paused_at = count.load(Ordering::SeqCst);
     tokio::time::sleep(Duration::from_millis(1500)).await;
     let still = count.load(Ordering::SeqCst);
-    assert!(still <= paused_at + 1, "kept firing while paused: {paused_at} -> {still}");
+    assert!(
+        still <= paused_at + 1,
+        "kept firing while paused: {paused_at} -> {still}"
+    );
 
     let sched = dbos::get_schedule(&ctx, "pausable").await.unwrap().unwrap();
     assert_eq!(sched.status, "PAUSED");
@@ -159,7 +169,10 @@ async fn pause_stops_resume_restarts() {
     dbos::resume_schedule(&ctx, "pausable").await.unwrap();
     tokio::time::sleep(Duration::from_millis(1800)).await;
     let resumed = count.load(Ordering::SeqCst);
-    assert!(resumed > still, "did not resume firing: {still} -> {resumed}");
+    assert!(
+        resumed > still,
+        "did not resume firing: {still} -> {resumed}"
+    );
 
     ctx.shutdown(Duration::from_secs(5)).await;
 }

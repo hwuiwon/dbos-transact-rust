@@ -14,12 +14,17 @@ use dbos::{Config, DbosError, RunOptions, WfCtx, WorkflowStatusType};
 async fn register_run_one_step_workflow_succeeds() {
     let counter = Arc::new(AtomicUsize::new(0));
     let ctx = new_ctx("p1-basic").await;
-    dbos::register_workflow::<i32, i32, _, _>(&ctx, "two_step_wf", counting_two_step(counter.clone()))
-        .unwrap();
+    dbos::register_workflow::<i32, i32, _, _>(
+        &ctx,
+        "two_step_wf",
+        counting_two_step(counter.clone()),
+    )
+    .unwrap();
     ctx.launch().await.unwrap();
 
-    let handle =
-        dbos::run_workflow::<i32, i32>(&ctx, "two_step_wf", 10, RunOptions::default()).await.unwrap();
+    let handle = dbos::run_workflow::<i32, i32>(&ctx, "two_step_wf", 10, RunOptions::default())
+        .await
+        .unwrap();
     let result = handle.get_result().await.unwrap();
     assert_eq!(result, 12);
 
@@ -35,17 +40,28 @@ async fn register_run_one_step_workflow_succeeds() {
 async fn executed_only_once_with_fixed_id() {
     let counter = Arc::new(AtomicUsize::new(0));
     let ctx = new_ctx("p1-once").await;
-    dbos::register_workflow::<i32, i32, _, _>(&ctx, "two_step_wf", counting_two_step(counter.clone()))
-        .unwrap();
+    dbos::register_workflow::<i32, i32, _, _>(
+        &ctx,
+        "two_step_wf",
+        counting_two_step(counter.clone()),
+    )
+    .unwrap();
     ctx.launch().await.unwrap();
 
-    let opts = || RunOptions { workflow_id: Some("fixed-id".into()), ..Default::default() };
+    let opts = || RunOptions {
+        workflow_id: Some("fixed-id".into()),
+        ..Default::default()
+    };
 
-    let h1 = dbos::run_workflow::<i32, i32>(&ctx, "two_step_wf", 100, opts()).await.unwrap();
+    let h1 = dbos::run_workflow::<i32, i32>(&ctx, "two_step_wf", 100, opts())
+        .await
+        .unwrap();
     assert_eq!(h1.get_result().await.unwrap(), 102);
 
     // A second run with the same id attaches to the terminal workflow.
-    let h2 = dbos::run_workflow::<i32, i32>(&ctx, "two_step_wf", 100, opts()).await.unwrap();
+    let h2 = dbos::run_workflow::<i32, i32>(&ctx, "two_step_wf", 100, opts())
+        .await
+        .unwrap();
     assert_eq!(h2.get_result().await.unwrap(), 102);
 
     let status = h2.get_status().await.unwrap();
@@ -60,15 +76,22 @@ async fn executed_only_once_with_fixed_id() {
 async fn recovery_replays_steps_and_increments_attempts() {
     let counter = Arc::new(AtomicUsize::new(0));
     let ctx = new_ctx_with_executor("p1-recovery", "local").await;
-    dbos::register_workflow::<i32, i32, _, _>(&ctx, "two_step_wf", counting_two_step(counter.clone()))
-        .unwrap();
+    dbos::register_workflow::<i32, i32, _, _>(
+        &ctx,
+        "two_step_wf",
+        counting_two_step(counter.clone()),
+    )
+    .unwrap();
     ctx.launch().await.unwrap();
 
     let h = dbos::run_workflow::<i32, i32>(
         &ctx,
         "two_step_wf",
         10,
-        RunOptions { workflow_id: Some("wf-rec".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("wf-rec".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
@@ -76,17 +99,27 @@ async fn recovery_replays_steps_and_increments_attempts() {
     assert_eq!(counter.load(Ordering::SeqCst), 2);
 
     // Simulate a crash: flip the completed workflow back to PENDING.
-    ctx.system_database().set_workflow_status_pending("wf-rec").await.unwrap();
+    ctx.system_database()
+        .set_workflow_status_pending("wf-rec")
+        .await
+        .unwrap();
 
     // Recover: the body re-runs but every step is replayed from operation_outputs.
-    let handles = dbos::recover_pending_workflows(&ctx, &["local"]).await.unwrap();
+    let handles = dbos::recover_pending_workflows(&ctx, &["local"])
+        .await
+        .unwrap();
     assert_eq!(handles.len(), 1);
     let recovered = handles[0].get_result().await.unwrap();
     assert_eq!(recovered, serde_json::json!(12));
     // No step body re-executed.
     assert_eq!(counter.load(Ordering::SeqCst), 2);
 
-    let status = ctx.system_database().get_workflow_status("wf-rec").await.unwrap().unwrap();
+    let status = ctx
+        .system_database()
+        .get_workflow_status("wf-rec")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(status.status, WorkflowStatusType::Success);
     assert_eq!(status.attempts, 2);
 
@@ -108,8 +141,9 @@ async fn workflow_error_is_durable_and_replayed() {
     dbos::register_workflow::<(), i32, _, _>(&ctx, "failing_wf", failing_wf).unwrap();
     ctx.launch().await.unwrap();
 
-    let h =
-        dbos::run_workflow::<(), i32>(&ctx, "failing_wf", (), RunOptions::default()).await.unwrap();
+    let h = dbos::run_workflow::<(), i32>(&ctx, "failing_wf", (), RunOptions::default())
+        .await
+        .unwrap();
     let err = h.get_result().await.unwrap_err();
     assert!(err.message.contains("kaboom"));
 
@@ -133,10 +167,13 @@ async fn config_validation_and_double_launch() {
     assert!(err.is_code(dbos::DbosErrorCode::Initialization));
 
     // Missing database.
-    let err = dbos::new_context(Config { app_name: "x".into(), ..Default::default() })
-        .await
-        .err()
-        .unwrap();
+    let err = dbos::new_context(Config {
+        app_name: "x".into(),
+        ..Default::default()
+    })
+    .await
+    .err()
+    .unwrap();
     assert!(err.is_code(dbos::DbosErrorCode::Initialization));
 
     // Double launch.
@@ -182,10 +219,12 @@ async fn sqlite_file_url_roundtrip() {
     .await
     .unwrap();
     let counter = Arc::new(AtomicUsize::new(0));
-    dbos::register_workflow::<i32, i32, _, _>(&ctx, "two_step_wf", counting_two_step(counter)).unwrap();
+    dbos::register_workflow::<i32, i32, _, _>(&ctx, "two_step_wf", counting_two_step(counter))
+        .unwrap();
     ctx.launch().await.unwrap();
-    let h =
-        dbos::run_workflow::<i32, i32>(&ctx, "two_step_wf", 1, RunOptions::default()).await.unwrap();
+    let h = dbos::run_workflow::<i32, i32>(&ctx, "two_step_wf", 1, RunOptions::default())
+        .await
+        .unwrap();
     assert_eq!(h.get_result().await.unwrap(), 3);
     ctx.shutdown(Duration::from_secs(5)).await;
 }

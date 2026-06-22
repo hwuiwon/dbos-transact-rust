@@ -135,7 +135,9 @@ async fn set_status(ctx: &Arc<DbosContext>, name: &str, status: &str) -> Result<
         return Err(DbosError::initialization("schedule_name is required"));
     }
     if ctx.db.get_schedule(name).await?.is_none() {
-        return Err(DbosError::initialization(format!("schedule not found: {name}")));
+        return Err(DbosError::initialization(format!(
+            "schedule not found: {name}"
+        )));
     }
     ctx.db.set_schedule_status(name, status).await
 }
@@ -158,5 +160,11 @@ pub async fn get_schedule(
 
 /// List all schedules.
 pub async fn list_schedules(ctx: &Arc<DbosContext>) -> Result<Vec<WorkflowSchedule>, DbosError> {
-    Ok(ctx.db.list_schedules().await?.into_iter().map(WorkflowSchedule::from).collect())
+    Ok(ctx
+        .db
+        .list_schedules()
+        .await?
+        .into_iter()
+        .map(WorkflowSchedule::from)
+        .collect())
 }

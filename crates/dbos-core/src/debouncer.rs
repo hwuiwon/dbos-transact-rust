@@ -169,8 +169,11 @@ where
 
                     // Send the updated input and wait for the internal wf to ACK.
                     let message_id = crate::util::new_uuid();
-                    let msg =
-                        DebounceMessage { input: input.clone(), delay_ms, id: message_id.clone() };
+                    let msg = DebounceMessage {
+                        input: input.clone(),
+                        delay_ms,
+                        id: message_id.clone(),
+                    };
                     crate::workflow::comms::send(ctx, &existing_internal, msg, DEBOUNCER_TOPIC)
                         .await?;
                     let acked: Option<bool> = crate::workflow::comms::get_event(
@@ -227,8 +230,8 @@ where
     if ctx.registry.read().unwrap().contains_key(internal_name) {
         return Ok(());
     }
-    let body = move |wfctx: WfCtx, input: DebouncerInput<P>| {
-        async move { internal_debouncer_body::<P>(wfctx, input).await }
+    let body = move |wfctx: WfCtx, input: DebouncerInput<P>| async move {
+        internal_debouncer_body::<P>(wfctx, input).await
     };
     register_workflow_opts::<DebouncerInput<P>, (), _, _>(
         ctx,
@@ -240,16 +243,15 @@ where
 
 /// The internal debouncer workflow: collect updates, sleep to the target start
 /// time, then enqueue the target workflow exactly once with the latest input.
-async fn internal_debouncer_body<P>(
-    ctx: WfCtx,
-    input: DebouncerInput<P>,
-) -> Result<(), DbosError>
+async fn internal_debouncer_body<P>(ctx: WfCtx, input: DebouncerInput<P>) -> Result<(), DbosError>
 where
     P: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
 {
     // First-creation time as a durable step (stable across replay).
     let start_ms = ctx
-        .run_step("DBOS.debounce.startTime", |_s| async move { Ok::<i64, DbosError>(now_ms()) })
+        .run_step("DBOS.debounce.startTime", |_s| async move {
+            Ok::<i64, DbosError>(now_ms())
+        })
         .await?;
     let timeout_ms = input.timeout_ms;
     let max_start_ms = start_ms + timeout_ms;
@@ -263,14 +265,19 @@ where
     // Collect-and-delay loop.
     loop {
         let now = ctx
-            .run_step("DBOS.debounce.loopTime", |_s| async move { Ok::<i64, DbosError>(now_ms()) })
+            .run_step("DBOS.debounce.loopTime", |_s| async move {
+                Ok::<i64, DbosError>(now_ms())
+            })
             .await?;
         let remaining = target_start_ms - now;
         if remaining <= 0 {
             break;
         }
         let recv_timeout = Duration::from_millis(remaining as u64);
-        match ctx.recv::<DebounceMessage<P>>(DEBOUNCER_TOPIC, recv_timeout).await {
+        match ctx
+            .recv::<DebounceMessage<P>>(DEBOUNCER_TOPIC, recv_timeout)
+            .await
+        {
             Ok(msg) => {
                 current_input = msg.input;
                 let mut new_target = now + msg.delay_ms;

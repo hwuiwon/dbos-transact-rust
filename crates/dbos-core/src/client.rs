@@ -134,10 +134,7 @@ impl Client {
         manage::list_workflows(&self.ctx, input).await
     }
 
-    pub async fn get_workflow_steps(
-        &self,
-        workflow_id: &str,
-    ) -> Result<Vec<StepInfo>, DbosError> {
+    pub async fn get_workflow_steps(&self, workflow_id: &str) -> Result<Vec<StepInfo>, DbosError> {
         manage::get_workflow_steps(&self.ctx, workflow_id).await
     }
 

@@ -39,8 +39,12 @@ fn recording_target(
 async fn rapid_calls_coalesce_into_one_run() {
     let ctx = new_ctx("deb-coalesce").await;
     let runs = Arc::new(AtomicUsize::new(0));
-    dbos::register_workflow::<String, String, _, _>(&ctx, "deb_target", recording_target(runs.clone()))
-        .unwrap();
+    dbos::register_workflow::<String, String, _, _>(
+        &ctx,
+        "deb_target",
+        recording_target(runs.clone()),
+    )
+    .unwrap();
 
     let deb = Debouncer::<String, String>::new(&ctx, "deb_target", Duration::ZERO).unwrap();
     ctx.launch().await.unwrap();
@@ -65,7 +69,11 @@ async fn rapid_calls_coalesce_into_one_run() {
 
     // Give any stragglers a moment, then assert exactly-once.
     tokio::time::sleep(Duration::from_millis(300)).await;
-    assert_eq!(runs.load(Ordering::SeqCst), 1, "target should run exactly once");
+    assert_eq!(
+        runs.load(Ordering::SeqCst),
+        1,
+        "target should run exactly once"
+    );
 
     ctx.shutdown(Duration::from_secs(5)).await;
 }
@@ -102,10 +110,17 @@ async fn timeout_caps_pushback() {
     let result = last.unwrap().get_result().await.unwrap();
     let elapsed = started.elapsed();
 
-    assert_eq!(runs.load(Ordering::SeqCst), 1, "calls within the cap window coalesce into one run");
+    assert_eq!(
+        runs.load(Ordering::SeqCst),
+        1,
+        "calls within the cap window coalesce into one run"
+    );
     assert_eq!(result, "v2", "the last input should win");
     // Capped at ~300ms (+ polling), well under the uncapped ~3s push-back.
-    assert!(elapsed < Duration::from_millis(2000), "timeout cap should force an early run: {elapsed:?}");
+    assert!(
+        elapsed < Duration::from_millis(2000),
+        "timeout cap should force an early run: {elapsed:?}"
+    );
 
     ctx.shutdown(Duration::from_secs(5)).await;
 }
@@ -126,16 +141,30 @@ async fn key_is_reusable_across_cycles() {
     ctx.launch().await.unwrap();
 
     // Cycle 1.
-    let h1 = deb.debounce(&ctx, "doc", Duration::from_millis(150), "first".into()).await.unwrap();
+    let h1 = deb
+        .debounce(&ctx, "doc", Duration::from_millis(150), "first".into())
+        .await
+        .unwrap();
     assert_eq!(h1.get_result().await.unwrap(), "first");
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert_eq!(runs.load(Ordering::SeqCst), 1);
 
     // Cycle 2 — same key, after cycle 1 completed.
-    let h2 = deb.debounce(&ctx, "doc", Duration::from_millis(150), "second".into()).await.unwrap();
-    assert_eq!(h2.get_result().await.unwrap(), "second", "reused key must run a fresh cycle");
+    let h2 = deb
+        .debounce(&ctx, "doc", Duration::from_millis(150), "second".into())
+        .await
+        .unwrap();
+    assert_eq!(
+        h2.get_result().await.unwrap(),
+        "second",
+        "reused key must run a fresh cycle"
+    );
     tokio::time::sleep(Duration::from_millis(200)).await;
-    assert_eq!(runs.load(Ordering::SeqCst), 2, "two cycles -> two target runs");
+    assert_eq!(
+        runs.load(Ordering::SeqCst),
+        2,
+        "two cycles -> two target runs"
+    );
 
     ctx.shutdown(Duration::from_secs(5)).await;
 }
@@ -153,13 +182,23 @@ async fn distinct_keys_run_independently() {
     let deb = Debouncer::<String, String>::new(&ctx, "deb_target_k", Duration::ZERO).unwrap();
     ctx.launch().await.unwrap();
 
-    let h1 = deb.debounce(&ctx, "a", Duration::from_millis(150), "a-val".into()).await.unwrap();
-    let h2 = deb.debounce(&ctx, "b", Duration::from_millis(150), "b-val".into()).await.unwrap();
+    let h1 = deb
+        .debounce(&ctx, "a", Duration::from_millis(150), "a-val".into())
+        .await
+        .unwrap();
+    let h2 = deb
+        .debounce(&ctx, "b", Duration::from_millis(150), "b-val".into())
+        .await
+        .unwrap();
 
     assert_eq!(h1.get_result().await.unwrap(), "a-val");
     assert_eq!(h2.get_result().await.unwrap(), "b-val");
     tokio::time::sleep(Duration::from_millis(200)).await;
-    assert_eq!(runs.load(Ordering::SeqCst), 2, "two distinct keys -> two runs");
+    assert_eq!(
+        runs.load(Ordering::SeqCst),
+        2,
+        "two distinct keys -> two runs"
+    );
 
     ctx.shutdown(Duration::from_secs(5)).await;
 }

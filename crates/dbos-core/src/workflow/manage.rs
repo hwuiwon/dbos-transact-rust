@@ -123,7 +123,9 @@ pub async fn garbage_collect_workflows(
     cutoff_epoch_ms: Option<i64>,
     rows_threshold: Option<i64>,
 ) -> Result<u64, DbosError> {
-    ctx.db.garbage_collect(cutoff_epoch_ms, rows_threshold).await
+    ctx.db
+        .garbage_collect(cutoff_epoch_ms, rows_threshold)
+        .await
 }
 
 /// All of a workflow's recorded events as `(key, value, serialization)` rows.
@@ -153,9 +155,7 @@ pub async fn get_workflow_streams(
 }
 
 /// Step-execution counts grouped by function name: `(function_name, count)`.
-pub async fn get_step_aggregates(
-    ctx: &Arc<DbosContext>,
-) -> Result<Vec<(String, i64)>, DbosError> {
+pub async fn get_step_aggregates(ctx: &Arc<DbosContext>) -> Result<Vec<(String, i64)>, DbosError> {
     ctx.db.get_step_aggregates().await
 }
 

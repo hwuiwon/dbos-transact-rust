@@ -63,7 +63,10 @@ async fn chaos_workflows_survive_database_restart() {
                 &ctx,
                 "chained",
                 i,
-                RunOptions { workflow_id: Some(format!("chaos-{i}")), ..Default::default() },
+                RunOptions {
+                    workflow_id: Some(format!("chaos-{i}")),
+                    ..Default::default()
+                },
             )
             .await
             .unwrap(),
@@ -90,7 +93,9 @@ async fn chaos_workflows_survive_database_restart() {
 
     // No double execution: each workflow recorded exactly its 3 steps.
     for i in 0..N {
-        let steps = dbos::get_workflow_steps(&ctx, &format!("chaos-{i}")).await.unwrap();
+        let steps = dbos::get_workflow_steps(&ctx, &format!("chaos-{i}"))
+            .await
+            .unwrap();
         assert_eq!(steps.len(), 3, "workflow {i} should have exactly 3 steps");
     }
 

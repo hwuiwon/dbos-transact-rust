@@ -72,7 +72,8 @@ impl WfCtx {
         let started = now_ms();
         let result = f(step_ctx).await;
         let completed = now_ms();
-        self.record_step(&workflow_id, step_id, name, started, completed, &result).await?;
+        self.record_step(&workflow_id, step_id, name, started, completed, &result)
+            .await?;
         result
     }
 
@@ -101,9 +102,12 @@ impl WfCtx {
 
         let step_ctx = self.step_ctx(step_id);
         let started = now_ms();
-        let result = self.execute_with_retry(&workflow_id, name, &opts, &f, step_ctx).await;
+        let result = self
+            .execute_with_retry(&workflow_id, name, &opts, &f, step_ctx)
+            .await;
         let completed = now_ms();
-        self.record_step(&workflow_id, step_id, name, started, completed, &result).await?;
+        self.record_step(&workflow_id, step_id, name, started, completed, &result)
+            .await?;
         result
     }
 
@@ -198,8 +202,11 @@ impl WfCtx {
         step_id: i64,
         name: &str,
     ) -> Result<Option<Result<R, DbosError>>, DbosError> {
-        let Some(recorded) =
-            self.ctx.db.check_operation_execution(self.workflow_id(), step_id, name).await?
+        let Some(recorded) = self
+            .ctx
+            .db
+            .check_operation_execution(self.workflow_id(), step_id, name)
+            .await?
         else {
             return Ok(None);
         };
@@ -215,7 +222,10 @@ impl WfCtx {
             return Ok(Some(Err(e)));
         }
         let decoder = resolve_decoder(&recorded.serialization, self.ctx.serializer.as_ref())?;
-        Ok(Some(Ok(serialization::decode::<R>(decoder.as_ref(), &recorded.output)?)))
+        Ok(Some(Ok(serialization::decode::<R>(
+            decoder.as_ref(),
+            &recorded.output,
+        )?)))
     }
 
     async fn record_step<R: Serialize>(

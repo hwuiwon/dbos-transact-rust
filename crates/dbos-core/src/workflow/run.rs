@@ -56,10 +56,16 @@ where
 {
     // Encode the input.
     let (encoded, serialization_name) = if opts.portable {
-        (encode_portable_args(&input)?, PORTABLE_SERIALIZER_NAME.to_string())
+        (
+            encode_portable_args(&input)?,
+            PORTABLE_SERIALIZER_NAME.to_string(),
+        )
     } else {
         let encoder = resolve_encoder(false, ctx.serializer.as_ref());
-        (serialization::encode(encoder.as_ref(), &input)?, encoder.name().to_string())
+        (
+            serialization::encode(encoder.as_ref(), &input)?,
+            encoder.name().to_string(),
+        )
     };
 
     let handle = run_workflow_erased(
@@ -122,14 +128,23 @@ pub(crate) async fn run_workflow_erased(
         return Err(exec_err("", "delay provided but queue name is missing"));
     }
     if !partition_key.is_empty() && queue_name.is_empty() {
-        return Err(exec_err("", "partition key provided but queue name is missing"));
+        return Err(exec_err(
+            "",
+            "partition key provided but queue name is missing",
+        ));
     }
     if !partition_key.is_empty() && !dedup_id.is_empty() {
-        return Err(exec_err("", "partition key and deduplication ID cannot be used together"));
+        return Err(exec_err(
+            "",
+            "partition key and deduplication ID cannot be used together",
+        ));
     }
     if opts.deduplication_policy != crate::workflow::DeduplicationPolicy::Reject {
         if dedup_id.is_empty() {
-            return Err(exec_err("", "a deduplication policy requires a deduplication ID"));
+            return Err(exec_err(
+                "",
+                "a deduplication policy requires a deduplication ID",
+            ));
         }
         if queue_name.is_empty() {
             return Err(exec_err("", "a deduplication policy requires a queue name"));
@@ -230,13 +245,20 @@ pub(crate) async fn run_workflow_erased(
         assumed_role: opts.assumed_role.clone().unwrap_or_default(),
         authenticated_roles: opts.authenticated_roles.clone(),
     });
-    let wfctx = WfCtx { ctx: ctx.clone(), state, is_within_step: false };
+    let wfctx = WfCtx {
+        ctx: ctx.clone(),
+        state,
+        is_within_step: false,
+    };
 
     ctx.active_workflow_ids.insert(
         workflow_id.clone(),
         ActiveEntry {
             queue_name: insert_result.queue_name.clone().unwrap_or_default(),
-            queue_partition_key: insert_result.queue_partition_key.clone().unwrap_or_default(),
+            queue_partition_key: insert_result
+                .queue_partition_key
+                .clone()
+                .unwrap_or_default(),
         },
     );
 
@@ -276,17 +298,29 @@ pub(crate) async fn run_workflow_erased(
                     .db
                     .update_workflow_outcome(&wf_id, WorkflowStatusType::Success, &output, "")
                     .await;
-                Ok(EncodedOutcome { output, serialization: outcome_serialization })
+                Ok(EncodedOutcome {
+                    output,
+                    serialization: outcome_serialization,
+                })
             }
             Err(e) if e.is_code(DbosErrorCode::ConflictingId) => {
                 // Another execution owns this id; wait for its durable result.
-                match task_ctx.db.await_workflow_result(&wf_id, DB_RETRY_INTERVAL).await {
+                match task_ctx
+                    .db
+                    .await_workflow_result(&wf_id, DB_RETRY_INTERVAL)
+                    .await
+                {
                     Ok(ar) => {
                         if let Some(es) = &ar.error {
-                            Err(deserialize_workflow_error(&Some(es.clone()), &ar.serialization)
-                                .unwrap_or(e))
+                            Err(
+                                deserialize_workflow_error(&Some(es.clone()), &ar.serialization)
+                                    .unwrap_or(e),
+                            )
                         } else {
-                            Ok(EncodedOutcome { output: ar.output, serialization: ar.serialization })
+                            Ok(EncodedOutcome {
+                                output: ar.output,
+                                serialization: ar.serialization,
+                            })
                         }
                     }
                     Err(await_err) => Err(await_err),
@@ -355,15 +389,26 @@ impl WfCtx {
         let parent_id = self.workflow_id().to_string();
 
         // Already recorded (replay): return a polling handle to the child.
-        if let Some(child_id) = self.ctx.db.check_child_workflow(&parent_id, step_id).await? {
+        if let Some(child_id) = self
+            .ctx
+            .db
+            .check_child_workflow(&parent_id, step_id)
+            .await?
+        {
             return Ok(boxed_polling::<R>(self.ctx.clone(), child_id));
         }
 
         let (encoded, serialization_name) = if opts.portable {
-            (encode_portable_args(&input)?, PORTABLE_SERIALIZER_NAME.to_string())
+            (
+                encode_portable_args(&input)?,
+                PORTABLE_SERIALIZER_NAME.to_string(),
+            )
         } else {
             let encoder = resolve_encoder(false, self.ctx.serializer.as_ref());
-            (serialization::encode(encoder.as_ref(), &input)?, encoder.name().to_string())
+            (
+                serialization::encode(encoder.as_ref(), &input)?,
+                encoder.name().to_string(),
+            )
         };
 
         let handle = run_workflow_erased(
@@ -373,7 +418,10 @@ impl WfCtx {
             serialization_name,
             opts,
             RunFlags::default(),
-            Some(ChildSpawn { parent_workflow_id: parent_id, step_id }),
+            Some(ChildSpawn {
+                parent_workflow_id: parent_id,
+                step_id,
+            }),
         )
         .await?;
 
@@ -384,7 +432,9 @@ impl WfCtx {
                 rx: Mutex::new(Some(rx)),
                 _marker: PhantomData,
             }),
-            ErasedHandle::Polling { workflow_id } => boxed_polling::<R>(self.ctx.clone(), workflow_id),
+            ErasedHandle::Polling { workflow_id } => {
+                boxed_polling::<R>(self.ctx.clone(), workflow_id)
+            }
         })
     }
 }

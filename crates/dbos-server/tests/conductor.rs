@@ -36,7 +36,8 @@ async fn setup() -> (Arc<DbosContext>, String) {
     dbos::register_workflow::<i32, i32, _, _>(&ctx, "increment", increment).expect("register");
     // Register a named queue so the observability `list_queues` handler has a
     // known, non-internal entry to surface.
-    dbos::register_queue(&ctx, "test-queue", dbos::QueueOptions::default()).expect("register queue");
+    dbos::register_queue(&ctx, "test-queue", dbos::QueueOptions::default())
+        .expect("register queue");
     ctx.launch().await.expect("launch");
 
     let opts = RunOptions {
@@ -156,7 +157,9 @@ async fn delete_round_trip() {
     let v: serde_json::Value = serde_json::from_str(&resp).expect("json");
     let output = v["output"].as_array().expect("output array");
     assert!(
-        !output.iter().any(|w| w["WorkflowUUID"] == serde_json::json!(id)),
+        !output
+            .iter()
+            .any(|w| w["WorkflowUUID"] == serde_json::json!(id)),
         "deleted workflow still listed",
     );
 

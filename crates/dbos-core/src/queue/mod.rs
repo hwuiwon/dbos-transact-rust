@@ -53,7 +53,9 @@ pub fn register_queue(
     opts: QueueOptions,
 ) -> Result<(), DbosError> {
     if ctx.is_launched() {
-        return Err(DbosError::initialization("cannot register a queue after the context has been launched"));
+        return Err(DbosError::initialization(
+            "cannot register a queue after the context has been launched",
+        ));
     }
     let queue = WorkflowQueue {
         name: name.to_string(),

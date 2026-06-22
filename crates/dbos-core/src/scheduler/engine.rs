@@ -113,7 +113,11 @@ impl Scheduler {
     }
 
     fn installed_id(&self, name: &str) -> Option<String> {
-        self.installed.lock().unwrap().get(name).map(|i| i.schedule_id.clone())
+        self.installed
+            .lock()
+            .unwrap()
+            .get(name)
+            .map(|i| i.schedule_id.clone())
     }
 
     fn is_installed(&self, name: &str) -> bool {
@@ -121,7 +125,10 @@ impl Scheduler {
     }
 
     fn insert(&self, name: String, schedule_id: String, token: CancellationToken) {
-        self.installed.lock().unwrap().insert(name, Installed { schedule_id, token });
+        self.installed
+            .lock()
+            .unwrap()
+            .insert(name, Installed { schedule_id, token });
     }
 
     fn remove(&self, name: &str) {
@@ -173,14 +180,19 @@ async fn reconcile(ctx: &Arc<DbosContext>, token: &CancellationToken) {
             return;
         }
     };
-    let current: HashMap<String, ScheduleRow> =
-        schedules.into_iter().map(|s| (s.schedule_name.clone(), s)).collect();
+    let current: HashMap<String, ScheduleRow> = schedules
+        .into_iter()
+        .map(|s| (s.schedule_name.clone(), s))
+        .collect();
 
     // Phase 1: remove installed entries that are deleted, paused, or replaced.
     for name in ctx.scheduler.installed_names() {
         let stale = match current.get(&name) {
             None => true,
-            Some(s) => s.status != "ACTIVE" || ctx.scheduler.installed_id(&name).as_deref() != Some(&s.schedule_id),
+            Some(s) => {
+                s.status != "ACTIVE"
+                    || ctx.scheduler.installed_id(&name).as_deref() != Some(&s.schedule_id)
+            }
         };
         if stale {
             ctx.scheduler.remove(&name);
@@ -212,15 +224,21 @@ async fn reconcile(ctx: &Arc<DbosContext>, token: &CancellationToken) {
         }
 
         let child = token.child_token();
-        ctx.scheduler.insert(name.clone(), row.schedule_id.clone(), child.clone());
-        ctx.tracker.spawn(run_db_schedule(ctx.clone(), child, row.clone()));
+        ctx.scheduler
+            .insert(name.clone(), row.schedule_id.clone(), child.clone());
+        ctx.tracker
+            .spawn(run_db_schedule(ctx.clone(), child, row.clone()));
         tracing::debug!(schedule = %name, "added schedule to scheduler");
     }
 }
 
 /// Drive a single DB-backed schedule until `token` is cancelled: compute the
 /// next cron tick, sleep, enqueue a deterministic run, update `last_fired_at`.
-pub(crate) async fn run_db_schedule(ctx: Arc<DbosContext>, token: CancellationToken, row: ScheduleRow) {
+pub(crate) async fn run_db_schedule(
+    ctx: Arc<DbosContext>,
+    token: CancellationToken,
+    row: ScheduleRow,
+) {
     let schedule = match parse_cron(&row.schedule) {
         Ok(s) => s,
         Err(e) => {
@@ -228,7 +246,11 @@ pub(crate) async fn run_db_schedule(ctx: Arc<DbosContext>, token: CancellationTo
             return;
         }
     };
-    if row.cron_timezone.as_deref().is_some_and(|tz| !tz.is_empty()) {
+    if row
+        .cron_timezone
+        .as_deref()
+        .is_some_and(|tz| !tz.is_empty())
+    {
         // Named-timezone cron requires a tz database (chrono-tz), which is not a
         // dependency. Ticks are computed in UTC; document the limitation rather
         // than silently misfire.
@@ -258,7 +280,11 @@ pub(crate) async fn run_db_schedule(ctx: Arc<DbosContext>, token: CancellationTo
 }
 
 async fn fire_db(ctx: &Arc<DbosContext>, row: &ScheduleRow, scheduled_time: DateTime<Utc>) {
-    let workflow_id = format!("sched-{}-{}", row.schedule_name, scheduled_time.to_rfc3339());
+    let workflow_id = format!(
+        "sched-{}-{}",
+        row.schedule_name,
+        scheduled_time.to_rfc3339()
+    );
     let queue = row
         .queue_name
         .clone()
@@ -311,7 +337,11 @@ async fn fire_db(ctx: &Arc<DbosContext>, row: &ScheduleRow, scheduled_time: Date
 
     // Best-effort last-fired update (advisory metadata only).
     let stamp = scheduled_time.to_rfc3339();
-    if let Err(e) = ctx.db.update_schedule_last_fired(&row.schedule_name, &stamp).await {
+    if let Err(e) = ctx
+        .db
+        .update_schedule_last_fired(&row.schedule_name, &stamp)
+        .await
+    {
         tracing::warn!(schedule = %row.schedule_name, error = %e, "failed to update schedule last fired time");
     }
 }
@@ -344,7 +374,10 @@ async fn backfill(
         if ctx.db.get_workflow_status(&workflow_id).await?.is_some() {
             continue;
         }
-        let input = ScheduledWorkflowInput { scheduled_time: next, context: decode_context(&row.context) };
+        let input = ScheduledWorkflowInput {
+            scheduled_time: next,
+            context: decode_context(&row.context),
+        };
         let encoded = serialization::encode(encoder.as_ref(), &input)?;
         let opts = RunOptions {
             workflow_id: Some(workflow_id),
@@ -373,5 +406,7 @@ fn decode_context(raw: &str) -> serde_json::Value {
 
 /// Parse an RFC3339 (or RFC3339Nano) string into a UTC datetime.
 fn parse_rfc3339(s: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(s).ok().map(|d| d.with_timezone(&Utc))
+    DateTime::parse_from_rfc3339(s)
+        .ok()
+        .map(|d| d.with_timezone(&Utc))
 }

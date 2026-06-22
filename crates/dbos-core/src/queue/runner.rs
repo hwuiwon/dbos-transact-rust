@@ -16,8 +16,8 @@ use crate::db::DequeueInput;
 use crate::queue::WorkflowQueue;
 use crate::serialization::PORTABLE_SERIALIZER_NAME;
 use crate::workflow::RunFlags;
-use crate::workflow::run::run_workflow_erased;
 use crate::workflow::RunOptions;
+use crate::workflow::run::run_workflow_erased;
 
 /// Run the queue supervisor until `token` is cancelled.
 pub(crate) async fn run_queue_runner(ctx: Arc<DbosContext>, token: CancellationToken) {
@@ -55,7 +55,10 @@ async fn dequeue_and_dispatch(ctx: &Arc<DbosContext>, queue: &WorkflowQueue) {
         queue_name: queue.name.clone(),
         global_concurrency: queue.global_concurrency,
         worker_concurrency: queue.worker_concurrency,
-        rate_limit: queue.rate_limit.as_ref().map(|r| (r.limit, r.period.as_secs_f64())),
+        rate_limit: queue
+            .rate_limit
+            .as_ref()
+            .map(|r| (r.limit, r.period.as_secs_f64())),
         max_tasks: queue.max_tasks_per_iteration,
         local_running_count: local_running,
         application_version: ctx.application_version().to_string(),
@@ -82,7 +85,10 @@ async fn dequeue_and_dispatch(ctx: &Arc<DbosContext>, queue: &WorkflowQueue) {
             dq.input,
             dq.serialization,
             opts,
-            RunFlags { is_dequeue: true, is_recovery: false },
+            RunFlags {
+                is_dequeue: true,
+                is_recovery: false,
+            },
             None,
         )
         .await

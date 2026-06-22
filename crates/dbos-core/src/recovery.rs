@@ -79,7 +79,10 @@ pub async fn recover_pending_workflows(
             wf.input.clone(),
             wf.serialization.clone(),
             opts,
-            RunFlags { is_recovery: true, is_dequeue: false },
+            RunFlags {
+                is_recovery: true,
+                is_dequeue: false,
+            },
             None,
         )
         .await?;

@@ -14,9 +14,7 @@ use crate::context::DbosContext;
 use crate::context::state::WfCtx;
 use crate::db::RecordOperationResultInput;
 use crate::error::DbosError;
-use crate::serialization::{
-    self, JsonSerializer, Serializer, resolve_decoder, resolve_encoder,
-};
+use crate::serialization::{self, JsonSerializer, Serializer, resolve_decoder, resolve_encoder};
 use crate::util::now_ms;
 
 /// Polling cadence while waiting for a notification/event on SQLite.
@@ -73,8 +71,11 @@ impl WfCtx {
         let topic = resolve_topic(topic);
 
         // Replay: return the recorded message (or timeout error).
-        if let Some(rec) =
-            self.ctx.db.check_operation_execution(&workflow_id, step_id, "DBOS.recv").await?
+        if let Some(rec) = self
+            .ctx
+            .db
+            .check_operation_execution(&workflow_id, step_id, "DBOS.recv")
+            .await?
         {
             return replay_message::<R>(&self.ctx, rec);
         }
@@ -87,7 +88,11 @@ impl WfCtx {
         })
         .await?;
 
-        let consumed = self.ctx.db.consume_oldest_notification(&workflow_id, &topic).await?;
+        let consumed = self
+            .ctx
+            .db
+            .consume_oldest_notification(&workflow_id, &topic)
+            .await?;
         let receiver_ser = resolve_encoder(self.is_portable(), self.ctx.serializer.as_ref())
             .name()
             .to_string();
@@ -117,7 +122,8 @@ impl WfCtx {
                     "DBOS.recv",
                     format!("no message received within {timeout:?}"),
                 );
-                let serialized = crate::serialization::serialize_workflow_error(&err, &receiver_ser);
+                let serialized =
+                    crate::serialization::serialize_workflow_error(&err, &receiver_ser);
                 self.ctx
                     .db
                     .record_operation_result(RecordOperationResultInput {
@@ -208,8 +214,11 @@ impl WfCtx {
         let step_id = self.next_step_id();
         let sleep_step_id = self.next_step_id();
 
-        if let Some(rec) =
-            self.ctx.db.check_operation_execution(&workflow_id, step_id, "DBOS.getEvent").await?
+        if let Some(rec) = self
+            .ctx
+            .db
+            .check_operation_execution(&workflow_id, step_id, "DBOS.getEvent")
+            .await?
         {
             return replay_message::<R>(&self.ctx, rec);
         }
@@ -278,8 +287,11 @@ impl WfCtx {
     ) -> Result<i64, DbosError> {
         let json = JsonSerializer;
         let workflow_id = self.workflow_id().to_string();
-        if let Some(rec) =
-            self.ctx.db.check_operation_execution(&workflow_id, sleep_step_id, "DBOS.sleep").await?
+        if let Some(rec) = self
+            .ctx
+            .db
+            .check_operation_execution(&workflow_id, sleep_step_id, "DBOS.sleep")
+            .await?
         {
             return serialization::decode::<i64>(&json, &rec.output);
         }
@@ -380,7 +392,8 @@ impl WfCtx {
                 JsonSerializer.name(),
             )
             .await?;
-        self.record_stream_step(&workflow_id, step_id, "DBOS.closeStream").await
+        self.record_stream_step(&workflow_id, step_id, "DBOS.closeStream")
+            .await
     }
 
     async fn write_stream_raw<P: Serialize>(
@@ -420,7 +433,8 @@ impl WfCtx {
                 &serialization_name,
             )
             .await?;
-        self.record_stream_step(&workflow_id, step_id, step_name).await
+        self.record_stream_step(&workflow_id, step_id, step_name)
+            .await
     }
 
     async fn record_stream_step(
@@ -463,7 +477,11 @@ pub async fn read_stream<R: DeserializeOwned>(
 }
 
 fn resolve_topic(topic: &str) -> String {
-    if topic.is_empty() { DBOS_NULL_TOPIC.to_string() } else { topic.to_string() }
+    if topic.is_empty() {
+        DBOS_NULL_TOPIC.to_string()
+    } else {
+        topic.to_string()
+    }
 }
 
 fn replay_message<R: DeserializeOwned>(
@@ -491,7 +509,12 @@ pub async fn send<P: Serialize>(
     let encoder = resolve_encoder(false, ctx.serializer.as_ref());
     let encoded = serialization::encode(encoder.as_ref(), &message)?;
     ctx.db
-        .send_notification(destination_id, &resolve_topic(topic), &encoded, encoder.name())
+        .send_notification(
+            destination_id,
+            &resolve_topic(topic),
+            &encoded,
+            encoder.name(),
+        )
         .await
 }
 

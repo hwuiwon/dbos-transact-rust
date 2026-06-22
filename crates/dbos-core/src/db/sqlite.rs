@@ -47,7 +47,9 @@ impl SqliteDb {
             .min_connections(1)
             .connect_with(opts)
             .await
-            .map_err(|e| DbosError::initialization(format!("failed to open sqlite database: {e}")))?;
+            .map_err(|e| {
+                DbosError::initialization(format!("failed to open sqlite database: {e}"))
+            })?;
         let db = SqliteDb { pool };
         Ok(Arc::new(db))
     }
@@ -68,14 +70,12 @@ impl SqliteDb {
 fn sqlite_connect_options(url: &str) -> Result<SqliteConnectOptions, DbosError> {
     // Accept `sqlite:`/`sqlite3:`/`file:` URLs as-is; treat anything else as a
     // bare filesystem path.
-    let normalized = if url.starts_with("sqlite:")
-        || url.starts_with("sqlite3:")
-        || url.starts_with("file:")
-    {
-        url.replacen("sqlite3:", "sqlite:", 1)
-    } else {
-        format!("sqlite://{url}")
-    };
+    let normalized =
+        if url.starts_with("sqlite:") || url.starts_with("sqlite3:") || url.starts_with("file:") {
+            url.replacen("sqlite3:", "sqlite:", 1)
+        } else {
+            format!("sqlite://{url}")
+        };
     let opts = SqliteConnectOptions::from_str(&normalized)
         .map_err(|e| DbosError::initialization(format!("invalid sqlite url {url:?}: {e}")))?
         .create_if_missing(true)
@@ -87,17 +87,24 @@ fn sqlite_connect_options(url: &str) -> Result<SqliteConnectOptions, DbosError> 
 }
 
 fn sql_err(context: &str, e: sqlx::Error) -> DbosError {
-    DbosError::new(crate::error::DbosErrorCode::WorkflowExecution, format!("{context}: {e}"))
-        .with_source(e)
+    DbosError::new(
+        crate::error::DbosErrorCode::WorkflowExecution,
+        format!("{context}: {e}"),
+    )
+    .with_source(e)
 }
 
 fn is_unique_violation(e: &sqlx::Error) -> bool {
     // sqlx maps both SQLITE_CONSTRAINT_UNIQUE and _PRIMARYKEY to UniqueViolation.
-    e.as_database_error().map(|d| d.is_unique_violation()).unwrap_or(false)
+    e.as_database_error()
+        .map(|d| d.is_unique_violation())
+        .unwrap_or(false)
 }
 
 fn is_foreign_key_violation(e: &sqlx::Error) -> bool {
-    e.as_database_error().map(|d| d.is_foreign_key_violation()).unwrap_or(false)
+    e.as_database_error()
+        .map(|d| d.is_foreign_key_violation())
+        .unwrap_or(false)
 }
 
 // --- statement splitting ---
@@ -122,13 +129,12 @@ fn split_statements(body: &str) -> Vec<String> {
 impl SystemDatabase for SqliteDb {
     async fn run_migrations(&self) -> Result<(), DbosError> {
         // Ensure the migrations table exists.
-        let exists: Option<i64> = sqlx::query_scalar(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
-        )
-        .bind(DBOS_MIGRATION_TABLE)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| sql_err("failed to probe sqlite_master", e))?;
+        let exists: Option<i64> =
+            sqlx::query_scalar("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+                .bind(DBOS_MIGRATION_TABLE)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| sql_err("failed to probe sqlite_master", e))?;
         if exists.is_none() {
             sqlx::query(&format!(
                 "CREATE TABLE {DBOS_MIGRATION_TABLE} (version INTEGER NOT NULL PRIMARY KEY)"
@@ -158,11 +164,13 @@ impl SystemDatabase for SqliteDb {
                     .map_err(|e| sql_err(&format!("failed to execute migration {version}"), e))?;
             }
             if current == 0 {
-                sqlx::query(&format!("INSERT INTO {DBOS_MIGRATION_TABLE} (version) VALUES (?)"))
-                    .bind(version)
-                    .execute(&mut *tx)
-                    .await
-                    .map_err(|e| sql_err("failed to insert migration version", e))?;
+                sqlx::query(&format!(
+                    "INSERT INTO {DBOS_MIGRATION_TABLE} (version) VALUES (?)"
+                ))
+                .bind(version)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| sql_err("failed to insert migration version", e))?;
             } else {
                 sqlx::query(&format!("UPDATE {DBOS_MIGRATION_TABLE} SET version = ?"))
                     .bind(version)
@@ -185,17 +193,26 @@ impl SystemDatabase for SqliteDb {
         let s = &input.status;
         let status = s.status.unwrap_or(WorkflowStatusType::Pending);
         // Enqueued/Delayed workflows start at 0 attempts (they have not run yet).
-        let attempts: i64 =
-            if matches!(status, WorkflowStatusType::Enqueued | WorkflowStatusType::Delayed) {
-                0
-            } else {
-                1
-            };
+        let attempts: i64 = if matches!(
+            status,
+            WorkflowStatusType::Enqueued | WorkflowStatusType::Delayed
+        ) {
+            0
+        } else {
+            1
+        };
         let updated_at = s.updated_at_ms.unwrap_or_else(now_ms);
         let recovery_increment: i64 = if input.increment_attempts { 1 } else { 0 };
-        let roles_json = serde_json::to_string(&s.authenticated_roles).unwrap_or_else(|_| "[]".into());
+        let roles_json =
+            serde_json::to_string(&s.authenticated_roles).unwrap_or_else(|_| "[]".into());
 
-        let opt = |v: &str| if v.is_empty() { None } else { Some(v.to_string()) };
+        let opt = |v: &str| {
+            if v.is_empty() {
+                None
+            } else {
+                Some(v.to_string())
+            }
+        };
 
         const SQL: &str = r#"INSERT INTO workflow_status (
             workflow_uuid, status, name, queue_name, authenticated_user, assumed_role,
@@ -536,11 +553,18 @@ impl SystemDatabase for SqliteDb {
 
         add_any("workflow_uuid", &input.workflow_ids, &mut str_binds);
         add_any("name", &input.workflow_name, &mut str_binds);
-        let status_strs: Vec<String> =
-            input.status.iter().map(|s| s.as_str().to_string()).collect();
+        let status_strs: Vec<String> = input
+            .status
+            .iter()
+            .map(|s| s.as_str().to_string())
+            .collect();
         add_any("status", &status_strs, &mut str_binds);
         add_any("executor_id", &input.executor_ids, &mut str_binds);
-        add_any("application_version", &input.application_version, &mut str_binds);
+        add_any(
+            "application_version",
+            &input.application_version,
+            &mut str_binds,
+        );
         if input.queues_only {
             clauses.push("queue_name IS NOT NULL".to_string());
         }
@@ -600,7 +624,11 @@ impl SystemDatabase for SqliteDb {
         workflow_id: &str,
         poll_interval: Duration,
     ) -> Result<AwaitResult, DbosError> {
-        let poll = if poll_interval.is_zero() { DB_RETRY_INTERVAL } else { poll_interval };
+        let poll = if poll_interval.is_zero() {
+            DB_RETRY_INTERVAL
+        } else {
+            poll_interval
+        };
         loop {
             let row: Option<SqliteRow> = sqlx::query(
                 "SELECT status, output, error, recovery_attempts, serialization
@@ -626,7 +654,11 @@ impl SystemDatabase for SqliteDb {
             match status {
                 Some(WorkflowStatusType::Success) | Some(WorkflowStatusType::Error) => {
                     let error = error.filter(|s| !s.is_empty());
-                    return Ok(AwaitResult { output, error, serialization });
+                    return Ok(AwaitResult {
+                        output,
+                        error,
+                        serialization,
+                    });
                 }
                 Some(WorkflowStatusType::Cancelled) => {
                     return Err(DbosError::awaited_workflow_cancelled(workflow_id));
@@ -757,7 +789,9 @@ impl SystemDatabase for SqliteDb {
         }
 
         if !out.is_empty() {
-            tx.commit().await.map_err(|e| sql_err("failed to commit dequeue", e))?;
+            tx.commit()
+                .await
+                .map_err(|e| sql_err("failed to commit dequeue", e))?;
         }
         Ok(out)
     }
@@ -886,15 +920,25 @@ impl SystemDatabase for SqliteDb {
                 format!("startStep must be >= 0, got {}", input.start_step),
             ));
         }
-        let forked_id = input.forked_workflow_id.clone().unwrap_or_else(crate::util::new_uuid);
-        let queue = input.queue_name.clone().unwrap_or_else(|| DBOS_INTERNAL_QUEUE_NAME.to_string());
+        let forked_id = input
+            .forked_workflow_id
+            .clone()
+            .unwrap_or_else(crate::util::new_uuid);
+        let queue = input
+            .queue_name
+            .clone()
+            .unwrap_or_else(|| DBOS_INTERNAL_QUEUE_NAME.to_string());
 
         let orig = self
             .get_workflow_status(&input.original_workflow_id)
             .await?
             .ok_or_else(|| DbosError::non_existent_workflow(&input.original_workflow_id))?;
-        let app_version = input.application_version.clone().unwrap_or(orig.application_version);
-        let roles = serde_json::to_string(&orig.authenticated_roles).unwrap_or_else(|_| "[]".into());
+        let app_version = input
+            .application_version
+            .clone()
+            .unwrap_or(orig.application_version);
+        let roles =
+            serde_json::to_string(&orig.authenticated_roles).unwrap_or_else(|_| "[]".into());
         let now = now_ms();
 
         let mut tx = self.begin().await?;
@@ -944,7 +988,9 @@ impl SystemDatabase for SqliteDb {
             .map_err(|e| sql_err("failed to copy operation outputs", e))?;
         }
 
-        tx.commit().await.map_err(|e| sql_err("failed to commit fork", e))?;
+        tx.commit()
+            .await
+            .map_err(|e| sql_err("failed to commit fork", e))?;
         Ok(forked_id)
     }
 
@@ -953,7 +999,10 @@ impl SystemDatabase for SqliteDb {
             .fetch_all(&self.pool)
             .await
             .map_err(|e| sql_err("failed to aggregate workflow counts", e))?;
-        Ok(rows.into_iter().map(|r| (r.get::<String, _>(0), r.get::<i64, _>(1))).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.get::<String, _>(0), r.get::<i64, _>(1)))
+            .collect())
     }
 
     async fn garbage_collect(
@@ -1082,7 +1131,9 @@ impl SystemDatabase for SqliteDb {
         .map_err(|e| sql_err("failed to consume notification", e))?;
         let message: Option<String> = row.get(0);
         let serialization: Option<String> = row.get(1);
-        tx.commit().await.map_err(|e| sql_err("failed to commit consume", e))?;
+        tx.commit()
+            .await
+            .map_err(|e| sql_err("failed to commit consume", e))?;
         Ok(Some((message, serialization.unwrap_or_default())))
     }
 
@@ -1120,7 +1171,9 @@ impl SystemDatabase for SqliteDb {
         .execute(&mut *tx)
         .await
         .map_err(|e| sql_err("failed to record event history", e))?;
-        tx.commit().await.map_err(|e| sql_err("failed to commit set_event", e))?;
+        tx.commit()
+            .await
+            .map_err(|e| sql_err("failed to commit set_event", e))?;
         Ok(())
     }
 
@@ -1324,7 +1377,12 @@ impl SystemDatabase for SqliteDb {
         .map_err(|e| sql_err("failed to aggregate step counts", e))?;
         Ok(rows
             .into_iter()
-            .map(|r| (r.get::<Option<String>, _>(0).unwrap_or_default(), r.get::<i64, _>(1)))
+            .map(|r| {
+                (
+                    r.get::<Option<String>, _>(0).unwrap_or_default(),
+                    r.get::<i64, _>(1),
+                )
+            })
             .collect())
     }
 
@@ -1351,10 +1409,7 @@ impl SystemDatabase for SqliteDb {
             .collect())
     }
 
-    async fn set_latest_application_version(
-        &self,
-        version_name: &str,
-    ) -> Result<(), DbosError> {
+    async fn set_latest_application_version(&self, version_name: &str) -> Result<(), DbosError> {
         sqlx::query("UPDATE application_versions SET version_timestamp = ? WHERE version_name = ?")
             .bind(now_ms())
             .bind(version_name)
@@ -1596,15 +1651,24 @@ mod tests {
             increment_attempts: inc,
             record_child: None,
         };
-        let r1 = db.insert_workflow_status(mk("owner-A", false)).await.unwrap();
+        let r1 = db
+            .insert_workflow_status(mk("owner-A", false))
+            .await
+            .unwrap();
         assert_eq!(r1.owner_xid, "owner-A");
         assert_eq!(r1.attempts, 1);
         // A second non-recovery insert sees the original owner, attempts unchanged.
-        let r2 = db.insert_workflow_status(mk("owner-B", false)).await.unwrap();
+        let r2 = db
+            .insert_workflow_status(mk("owner-B", false))
+            .await
+            .unwrap();
         assert_eq!(r2.owner_xid, "owner-A");
         assert_eq!(r2.attempts, 1);
         // A recovery insert increments attempts.
-        let r3 = db.insert_workflow_status(mk("owner-C", true)).await.unwrap();
+        let r3 = db
+            .insert_workflow_status(mk("owner-C", true))
+            .await
+            .unwrap();
         assert_eq!(r3.attempts, 2);
     }
 
@@ -1630,7 +1694,12 @@ mod tests {
         .unwrap();
 
         // No record yet.
-        assert!(db.check_operation_execution("wf-3", 0, "step_a").await.unwrap().is_none());
+        assert!(
+            db.check_operation_execution("wf-3", 0, "step_a")
+                .await
+                .unwrap()
+                .is_none()
+        );
 
         db.record_operation_result(RecordOperationResultInput {
             workflow_id: "wf-3".into(),
@@ -1645,11 +1714,18 @@ mod tests {
         .await
         .unwrap();
 
-        let rec = db.check_operation_execution("wf-3", 0, "step_a").await.unwrap().unwrap();
+        let rec = db
+            .check_operation_execution("wf-3", 0, "step_a")
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(rec.output.as_deref(), Some("b3V0"));
 
         // Wrong recorded name -> UnexpectedStep.
-        let err = db.check_operation_execution("wf-3", 0, "step_b").await.unwrap_err();
+        let err = db
+            .check_operation_execution("wf-3", 0, "step_b")
+            .await
+            .unwrap_err();
         assert!(err.is_code(crate::error::DbosErrorCode::UnexpectedStep));
 
         // Duplicate function_id -> ConflictingId.

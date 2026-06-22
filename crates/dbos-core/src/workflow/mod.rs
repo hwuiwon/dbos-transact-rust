@@ -138,38 +138,40 @@ where
     }
     let key = opts.custom_name.clone().unwrap_or_else(|| name.to_string());
 
-    let erased: ErasedWorkflowFn = Arc::new(move |wfctx: WfCtx, input: Option<String>, input_ser: String| {
-        let f = f.clone();
-        async move {
-            let workflow_id = wfctx.workflow_id().to_string();
-            // Decode the input into P.
-            let p: P = if input_ser == PORTABLE_SERIALIZER_NAME {
-                decode_portable_args::<P>(&input)?
-            } else {
-                let decoder = resolve_decoder(&input_ser, wfctx.ctx.serializer.as_ref())?;
-                serialization::decode::<P>(decoder.as_ref(), &input)?
-            };
+    let erased: ErasedWorkflowFn = Arc::new(
+        move |wfctx: WfCtx, input: Option<String>, input_ser: String| {
+            let f = f.clone();
+            async move {
+                let workflow_id = wfctx.workflow_id().to_string();
+                // Decode the input into P.
+                let p: P = if input_ser == PORTABLE_SERIALIZER_NAME {
+                    decode_portable_args::<P>(&input)?
+                } else {
+                    let decoder = resolve_decoder(&input_ser, wfctx.ctx.serializer.as_ref())?;
+                    serialization::decode::<P>(decoder.as_ref(), &input)?
+                };
 
-            // Run the user body, converting panics into recorded errors.
-            let fut = std::panic::AssertUnwindSafe(f(wfctx.clone(), p));
-            let r: R = match fut.catch_unwind().await {
-                Ok(Ok(r)) => r,
-                Ok(Err(e)) => return Err(e),
-                Err(_) => {
-                    return Err(DbosError::new(
-                        crate::error::DbosErrorCode::WorkflowExecution,
-                        format!("Workflow {workflow_id} execution error: workflow panicked"),
-                    ));
-                }
-            };
+                // Run the user body, converting panics into recorded errors.
+                let fut = std::panic::AssertUnwindSafe(f(wfctx.clone(), p));
+                let r: R = match fut.catch_unwind().await {
+                    Ok(Ok(r)) => r,
+                    Ok(Err(e)) => return Err(e),
+                    Err(_) => {
+                        return Err(DbosError::new(
+                            crate::error::DbosErrorCode::WorkflowExecution,
+                            format!("Workflow {workflow_id} execution error: workflow panicked"),
+                        ));
+                    }
+                };
 
-            // Encode the output.
-            let encoder = resolve_encoder(wfctx.is_portable(), wfctx.ctx.serializer.as_ref());
-            let out = serialization::encode::<R>(encoder.as_ref(), &r)?;
-            Ok(out)
-        }
-        .boxed()
-    });
+                // Encode the output.
+                let encoder = resolve_encoder(wfctx.is_portable(), wfctx.ctx.serializer.as_ref());
+                let out = serialization::encode::<R>(encoder.as_ref(), &r)?;
+                Ok(out)
+            }
+            .boxed()
+        },
+    );
 
     let entry = WorkflowEntry {
         erased,

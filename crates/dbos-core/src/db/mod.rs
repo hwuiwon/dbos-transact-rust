@@ -89,7 +89,8 @@ impl serde::Serialize for WorkflowStatusType {
 impl<'de> serde::Deserialize<'de> for WorkflowStatusType {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let s = String::deserialize(d)?;
-        Self::parse(&s).ok_or_else(|| serde::de::Error::custom(format!("invalid workflow status {s:?}")))
+        Self::parse(&s)
+            .ok_or_else(|| serde::de::Error::custom(format!("invalid workflow status {s:?}")))
     }
 }
 
@@ -451,11 +452,8 @@ pub trait SystemDatabase: Send + Sync {
     ) -> Result<(), DbosError>;
 
     /// Whether an unconsumed notification exists for `dest`/`topic`.
-    async fn has_unconsumed_notification(
-        &self,
-        dest: &str,
-        topic: &str,
-    ) -> Result<bool, DbosError>;
+    async fn has_unconsumed_notification(&self, dest: &str, topic: &str)
+    -> Result<bool, DbosError>;
 
     /// Atomically consume the oldest unconsumed notification, returning its
     /// (message, serialization) if any.
@@ -508,13 +506,11 @@ pub trait SystemDatabase: Send + Sync {
 
     /// All registered application versions as
     /// `(version_id, version_name, version_timestamp, created_at)`, newest first.
-    async fn list_application_versions(
-        &self,
-    ) -> Result<Vec<(String, String, i64, i64)>, DbosError>;
+    async fn list_application_versions(&self)
+    -> Result<Vec<(String, String, i64, i64)>, DbosError>;
 
     /// Bump an application version's timestamp to "now", making it the latest.
-    async fn set_latest_application_version(&self, version_name: &str)
-    -> Result<(), DbosError>;
+    async fn set_latest_application_version(&self, version_name: &str) -> Result<(), DbosError>;
 
     /// Append a value to a stream (errors if the stream is already closed).
     async fn write_stream(

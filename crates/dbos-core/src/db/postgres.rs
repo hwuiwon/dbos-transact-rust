@@ -55,9 +55,7 @@ impl PostgresDb {
         sqlx::query("CREATE SCHEMA IF NOT EXISTS dbos")
             .execute(&pool)
             .await
-            .map_err(|e| {
-                DbosError::initialization(format!("failed to create dbos schema: {e}"))
-            })?;
+            .map_err(|e| DbosError::initialization(format!("failed to create dbos schema: {e}")))?;
         let db = PostgresDb { pool };
         Ok(Arc::new(db))
     }
@@ -76,16 +74,23 @@ impl PostgresDb {
 }
 
 fn sql_err(context: &str, e: sqlx::Error) -> DbosError {
-    DbosError::new(crate::error::DbosErrorCode::WorkflowExecution, format!("{context}: {e}"))
-        .with_source(e)
+    DbosError::new(
+        crate::error::DbosErrorCode::WorkflowExecution,
+        format!("{context}: {e}"),
+    )
+    .with_source(e)
 }
 
 fn is_unique_violation(e: &sqlx::Error) -> bool {
-    e.as_database_error().map(|d| d.is_unique_violation()).unwrap_or(false)
+    e.as_database_error()
+        .map(|d| d.is_unique_violation())
+        .unwrap_or(false)
 }
 
 fn is_foreign_key_violation(e: &sqlx::Error) -> bool {
-    e.as_database_error().map(|d| d.is_foreign_key_violation()).unwrap_or(false)
+    e.as_database_error()
+        .map(|d| d.is_foreign_key_violation())
+        .unwrap_or(false)
 }
 
 // --- statement splitting (mirrors sqlite.rs `split_statements`) ---
@@ -149,11 +154,13 @@ impl SystemDatabase for PostgresDb {
                     .map_err(|e| sql_err(&format!("failed to execute migration {version}"), e))?;
             }
             if current == 0 {
-                sqlx::query(&format!("INSERT INTO {DBOS_MIGRATION_TABLE} (version) VALUES ($1)"))
-                    .bind(version)
-                    .execute(&mut *tx)
-                    .await
-                    .map_err(|e| sql_err("failed to insert migration version", e))?;
+                sqlx::query(&format!(
+                    "INSERT INTO {DBOS_MIGRATION_TABLE} (version) VALUES ($1)"
+                ))
+                .bind(version)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| sql_err("failed to insert migration version", e))?;
             } else {
                 sqlx::query(&format!("UPDATE {DBOS_MIGRATION_TABLE} SET version = $1"))
                     .bind(version)
@@ -176,17 +183,26 @@ impl SystemDatabase for PostgresDb {
         let s = &input.status;
         let status = s.status.unwrap_or(WorkflowStatusType::Pending);
         // Enqueued/Delayed workflows start at 0 attempts (they have not run yet).
-        let attempts: i64 =
-            if matches!(status, WorkflowStatusType::Enqueued | WorkflowStatusType::Delayed) {
-                0
-            } else {
-                1
-            };
+        let attempts: i64 = if matches!(
+            status,
+            WorkflowStatusType::Enqueued | WorkflowStatusType::Delayed
+        ) {
+            0
+        } else {
+            1
+        };
         let updated_at = s.updated_at_ms.unwrap_or_else(now_ms);
         let recovery_increment: i64 = if input.increment_attempts { 1 } else { 0 };
-        let roles_json = serde_json::to_string(&s.authenticated_roles).unwrap_or_else(|_| "[]".into());
+        let roles_json =
+            serde_json::to_string(&s.authenticated_roles).unwrap_or_else(|_| "[]".into());
 
-        let opt = |v: &str| if v.is_empty() { None } else { Some(v.to_string()) };
+        let opt = |v: &str| {
+            if v.is_empty() {
+                None
+            } else {
+                Some(v.to_string())
+            }
+        };
 
         const SQL: &str = r#"INSERT INTO workflow_status (
             workflow_uuid, status, name, queue_name, authenticated_user, assumed_role,
@@ -537,11 +553,18 @@ impl SystemDatabase for PostgresDb {
 
         add_any("workflow_uuid", &input.workflow_ids, &mut str_binds);
         add_any("name", &input.workflow_name, &mut str_binds);
-        let status_strs: Vec<String> =
-            input.status.iter().map(|s| s.as_str().to_string()).collect();
+        let status_strs: Vec<String> = input
+            .status
+            .iter()
+            .map(|s| s.as_str().to_string())
+            .collect();
         add_any("status", &status_strs, &mut str_binds);
         add_any("executor_id", &input.executor_ids, &mut str_binds);
-        add_any("application_version", &input.application_version, &mut str_binds);
+        add_any(
+            "application_version",
+            &input.application_version,
+            &mut str_binds,
+        );
         if input.queues_only {
             clauses.push("queue_name IS NOT NULL".to_string());
         }
@@ -599,7 +622,11 @@ impl SystemDatabase for PostgresDb {
         workflow_id: &str,
         poll_interval: Duration,
     ) -> Result<AwaitResult, DbosError> {
-        let poll = if poll_interval.is_zero() { DB_RETRY_INTERVAL } else { poll_interval };
+        let poll = if poll_interval.is_zero() {
+            DB_RETRY_INTERVAL
+        } else {
+            poll_interval
+        };
         loop {
             let row: Option<PgRow> = sqlx::query(
                 "SELECT status, output, error, recovery_attempts, serialization
@@ -625,7 +652,11 @@ impl SystemDatabase for PostgresDb {
             match status {
                 Some(WorkflowStatusType::Success) | Some(WorkflowStatusType::Error) => {
                     let error = error.filter(|s| !s.is_empty());
-                    return Ok(AwaitResult { output, error, serialization });
+                    return Ok(AwaitResult {
+                        output,
+                        error,
+                        serialization,
+                    });
                 }
                 Some(WorkflowStatusType::Cancelled) => {
                     return Err(DbosError::awaited_workflow_cancelled(workflow_id));
@@ -756,7 +787,9 @@ impl SystemDatabase for PostgresDb {
         }
 
         if !out.is_empty() {
-            tx.commit().await.map_err(|e| sql_err("failed to commit dequeue", e))?;
+            tx.commit()
+                .await
+                .map_err(|e| sql_err("failed to commit dequeue", e))?;
         }
         Ok(out)
     }
@@ -846,11 +879,13 @@ impl SystemDatabase for PostgresDb {
     }
 
     async fn get_workflow_children(&self, workflow_id: &str) -> Result<Vec<String>, DbosError> {
-        sqlx::query_scalar("SELECT workflow_uuid FROM workflow_status WHERE parent_workflow_id = $1")
-            .bind(workflow_id)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| sql_err("failed to get workflow children", e))
+        sqlx::query_scalar(
+            "SELECT workflow_uuid FROM workflow_status WHERE parent_workflow_id = $1",
+        )
+        .bind(workflow_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| sql_err("failed to get workflow children", e))
     }
 
     async fn get_workflow_steps(&self, workflow_id: &str) -> Result<Vec<StepInfo>, DbosError> {
@@ -886,15 +921,25 @@ impl SystemDatabase for PostgresDb {
                 format!("startStep must be >= 0, got {}", input.start_step),
             ));
         }
-        let forked_id = input.forked_workflow_id.clone().unwrap_or_else(crate::util::new_uuid);
-        let queue = input.queue_name.clone().unwrap_or_else(|| DBOS_INTERNAL_QUEUE_NAME.to_string());
+        let forked_id = input
+            .forked_workflow_id
+            .clone()
+            .unwrap_or_else(crate::util::new_uuid);
+        let queue = input
+            .queue_name
+            .clone()
+            .unwrap_or_else(|| DBOS_INTERNAL_QUEUE_NAME.to_string());
 
         let orig = self
             .get_workflow_status(&input.original_workflow_id)
             .await?
             .ok_or_else(|| DbosError::non_existent_workflow(&input.original_workflow_id))?;
-        let app_version = input.application_version.clone().unwrap_or(orig.application_version);
-        let roles = serde_json::to_string(&orig.authenticated_roles).unwrap_or_else(|_| "[]".into());
+        let app_version = input
+            .application_version
+            .clone()
+            .unwrap_or(orig.application_version);
+        let roles =
+            serde_json::to_string(&orig.authenticated_roles).unwrap_or_else(|_| "[]".into());
         let now = now_ms();
 
         let mut tx = self.begin().await?;
@@ -944,7 +989,9 @@ impl SystemDatabase for PostgresDb {
             .map_err(|e| sql_err("failed to copy operation outputs", e))?;
         }
 
-        tx.commit().await.map_err(|e| sql_err("failed to commit fork", e))?;
+        tx.commit()
+            .await
+            .map_err(|e| sql_err("failed to commit fork", e))?;
         Ok(forked_id)
     }
 
@@ -953,7 +1000,10 @@ impl SystemDatabase for PostgresDb {
             .fetch_all(&self.pool)
             .await
             .map_err(|e| sql_err("failed to aggregate workflow counts", e))?;
-        Ok(rows.into_iter().map(|r| (r.get::<String, _>(0), r.get::<i64, _>(1))).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.get::<String, _>(0), r.get::<i64, _>(1)))
+            .collect())
     }
 
     async fn garbage_collect(
@@ -1084,7 +1134,9 @@ impl SystemDatabase for PostgresDb {
         .map_err(|e| sql_err("failed to consume notification", e))?;
         let message: Option<String> = row.get(0);
         let serialization: Option<String> = row.get(1);
-        tx.commit().await.map_err(|e| sql_err("failed to commit consume", e))?;
+        tx.commit()
+            .await
+            .map_err(|e| sql_err("failed to commit consume", e))?;
         Ok(Some((message, serialization.unwrap_or_default())))
     }
 
@@ -1122,7 +1174,9 @@ impl SystemDatabase for PostgresDb {
         .execute(&mut *tx)
         .await
         .map_err(|e| sql_err("failed to record event history", e))?;
-        tx.commit().await.map_err(|e| sql_err("failed to commit set_event", e))?;
+        tx.commit()
+            .await
+            .map_err(|e| sql_err("failed to commit set_event", e))?;
         Ok(())
     }
 
@@ -1325,7 +1379,12 @@ impl SystemDatabase for PostgresDb {
         .map_err(|e| sql_err("failed to aggregate step counts", e))?;
         Ok(rows
             .into_iter()
-            .map(|r| (r.get::<Option<String>, _>(0).unwrap_or_default(), r.get::<i64, _>(1)))
+            .map(|r| {
+                (
+                    r.get::<Option<String>, _>(0).unwrap_or_default(),
+                    r.get::<i64, _>(1),
+                )
+            })
             .collect())
     }
 
@@ -1352,16 +1411,15 @@ impl SystemDatabase for PostgresDb {
             .collect())
     }
 
-    async fn set_latest_application_version(
-        &self,
-        version_name: &str,
-    ) -> Result<(), DbosError> {
-        sqlx::query("UPDATE application_versions SET version_timestamp = $1 WHERE version_name = $2")
-            .bind(now_ms())
-            .bind(version_name)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| sql_err("failed to set latest application version", e))?;
+    async fn set_latest_application_version(&self, version_name: &str) -> Result<(), DbosError> {
+        sqlx::query(
+            "UPDATE application_versions SET version_timestamp = $1 WHERE version_name = $2",
+        )
+        .bind(now_ms())
+        .bind(version_name)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| sql_err("failed to set latest application version", e))?;
         Ok(())
     }
 
@@ -1559,7 +1617,10 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        sqlx::query("CREATE SCHEMA dbos").execute(&pool).await.unwrap();
+        sqlx::query("CREATE SCHEMA dbos")
+            .execute(&pool)
+            .await
+            .unwrap();
         let db = PostgresDb::from_pool(pool);
         db.run_migrations().await.unwrap();
         db

@@ -82,8 +82,9 @@ pub(crate) fn process_config(cfg: Config) -> Result<ProcessedConfig, DbosError> 
         .or(cfg.executor_id.filter(|s| !s.is_empty()))
         .unwrap_or_else(|| DEFAULT_EXECUTOR_ID.to_string());
 
-    let application_id =
-        env_override("DBOS__APPID").or(cfg.application_id).unwrap_or_default();
+    let application_id = env_override("DBOS__APPID")
+        .or(cfg.application_id)
+        .unwrap_or_default();
 
     let application_version = env_override("DBOS__APPVERSION")
         .or(cfg.application_version.filter(|s| !s.is_empty()))

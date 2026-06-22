@@ -74,7 +74,9 @@ impl Serializer for JsonSerializer {
             return Ok(Some(NIL_MARKER.to_string()));
         }
         let bytes = serde_json::to_vec(v).map_err(SerializeError::Encode)?;
-        Ok(Some(base64::engine::general_purpose::STANDARD.encode(bytes)))
+        Ok(Some(
+            base64::engine::general_purpose::STANDARD.encode(bytes),
+        ))
     }
 
     fn decode_value(&self, s: &Option<String>) -> Result<serde_json::Value, SerializeError> {
@@ -205,9 +207,13 @@ pub(crate) fn decode_portable_args<T: DeserializeOwned + 'static>(
     data: &Option<String>,
 ) -> Result<T, DbosError> {
     let raw = match data {
-        None => return Ok(serde_json::from_value(serde_json::Value::Null).map_err(SerializeError::DecodeJson)?),
+        None => {
+            return Ok(serde_json::from_value(serde_json::Value::Null)
+                .map_err(SerializeError::DecodeJson)?);
+        }
         Some(s) if s == "null" => {
-            return Ok(serde_json::from_value(serde_json::Value::Null).map_err(SerializeError::DecodeJson)?);
+            return Ok(serde_json::from_value(serde_json::Value::Null)
+                .map_err(SerializeError::DecodeJson)?);
         }
         Some(s) => s,
     };
@@ -217,7 +223,10 @@ pub(crate) fn decode_portable_args<T: DeserializeOwned + 'static>(
     let envelope: PortableWorkflowArgs =
         serde_json::from_str(raw).map_err(SerializeError::DecodeJson)?;
     match envelope.positional_args.into_iter().next() {
-        None => Ok(serde_json::from_value(serde_json::Value::Null).map_err(SerializeError::DecodeJson)?),
+        None => {
+            Ok(serde_json::from_value(serde_json::Value::Null)
+                .map_err(SerializeError::DecodeJson)?)
+        }
         Some(v) => Ok(serde_json::from_value(v).map_err(SerializeError::DecodeJson)?),
     }
 }
@@ -320,8 +329,14 @@ mod tests {
 
     #[test]
     fn resolve_decoder_precedence() {
-        assert_eq!(resolve_decoder("", None).unwrap().name(), JSON_SERIALIZER_NAME);
-        assert_eq!(resolve_decoder("DBOS_JSON", None).unwrap().name(), JSON_SERIALIZER_NAME);
+        assert_eq!(
+            resolve_decoder("", None).unwrap().name(),
+            JSON_SERIALIZER_NAME
+        );
+        assert_eq!(
+            resolve_decoder("DBOS_JSON", None).unwrap().name(),
+            JSON_SERIALIZER_NAME
+        );
         assert_eq!(
             resolve_decoder("portable_json", None).unwrap().name(),
             PORTABLE_SERIALIZER_NAME
@@ -334,7 +349,10 @@ mod tests {
     fn portable_args_envelope() {
         let enc = encode_portable_args(&42i32).unwrap();
         // wrapped as a positional arg
-        assert_eq!(enc.as_deref(), Some("{\"namedArgs\":{},\"positionalArgs\":[42]}"));
+        assert_eq!(
+            enc.as_deref(),
+            Some("{\"namedArgs\":{},\"positionalArgs\":[42]}")
+        );
         let back: i32 = decode_portable_args(&enc).unwrap();
         assert_eq!(back, 42);
     }

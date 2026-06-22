@@ -58,13 +58,17 @@ where
     F: Fn(WfCtx, ScheduledTime) -> Fut + Send + Sync + Clone + 'static,
     Fut: Future<Output = Result<R, DbosError>> + Send + 'static,
 {
-    parse_cron(schedule)
-        .map_err(|e| DbosError::initialization(format!("invalid cron schedule {schedule:?}: {e}")))?;
+    parse_cron(schedule).map_err(|e| {
+        DbosError::initialization(format!("invalid cron schedule {schedule:?}: {e}"))
+    })?;
     register_workflow_opts(
         ctx,
         name,
         f,
-        RegisterOptions { schedule: Some(schedule.to_string()), ..Default::default() },
+        RegisterOptions {
+            schedule: Some(schedule.to_string()),
+            ..Default::default()
+        },
     )
 }
 

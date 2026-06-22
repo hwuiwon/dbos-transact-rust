@@ -91,7 +91,11 @@ pub struct PollingHandle<R> {
 
 impl<R> PollingHandle<R> {
     pub(crate) fn new(ctx: Arc<DbosContext>, workflow_id: String) -> Self {
-        Self { ctx, workflow_id, _marker: PhantomData }
+        Self {
+            ctx,
+            workflow_id,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -114,7 +118,10 @@ async fn poll_result<R: DeserializeOwned>(
     ctx: &Arc<DbosContext>,
     workflow_id: &str,
 ) -> Result<R, DbosError> {
-    let res = ctx.db.await_workflow_result(workflow_id, DB_RETRY_INTERVAL).await?;
+    let res = ctx
+        .db
+        .await_workflow_result(workflow_id, DB_RETRY_INTERVAL)
+        .await?;
     if let Some(err_str) = &res.error {
         if let Some(e) = deserialize_workflow_error(&Some(err_str.clone()), &res.serialization) {
             return Err(e);
@@ -123,7 +130,10 @@ async fn poll_result<R: DeserializeOwned>(
     decode_output::<R>(ctx, &res.output, &res.serialization)
 }
 
-async fn get_status(ctx: &Arc<DbosContext>, workflow_id: &str) -> Result<WorkflowStatus, DbosError> {
+async fn get_status(
+    ctx: &Arc<DbosContext>,
+    workflow_id: &str,
+) -> Result<WorkflowStatus, DbosError> {
     match ctx.db.get_workflow_status(workflow_id).await? {
         Some(s) => Ok(s),
         None => Err(DbosError::non_existent_workflow(workflow_id)),

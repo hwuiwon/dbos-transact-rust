@@ -60,11 +60,12 @@ async fn invalid_cron_is_rejected() {
     let ctx = new_ctx("p5-bad-cron").await;
     let wf = |ctx: WfCtx, _t: ScheduledTime| {
         Box::pin(async move {
-            ctx.run_step("noop", |_s| async move { Ok::<i64, DbosError>(0) }).await
+            ctx.run_step("noop", |_s| async move { Ok::<i64, DbosError>(0) })
+                .await
         }) as BoxFuture<'static, Result<i64, DbosError>>
     };
-    let err = dbos::register_scheduled_workflow::<i64, _, _>(&ctx, "bad", "not a cron", wf)
-        .unwrap_err();
+    let err =
+        dbos::register_scheduled_workflow::<i64, _, _>(&ctx, "bad", "not a cron", wf).unwrap_err();
     assert!(err.is_code(dbos::DbosErrorCode::Initialization));
 }
 
@@ -73,7 +74,8 @@ async fn five_field_cron_is_accepted() {
     let ctx = new_ctx("p5-5field").await;
     let wf = |ctx: WfCtx, _t: ScheduledTime| {
         Box::pin(async move {
-            ctx.run_step("noop", |_s| async move { Ok::<i64, DbosError>(0) }).await
+            ctx.run_step("noop", |_s| async move { Ok::<i64, DbosError>(0) })
+                .await
         }) as BoxFuture<'static, Result<i64, DbosError>>
     };
     // Standard 5-field crontab (every minute) is normalized to 6-field.

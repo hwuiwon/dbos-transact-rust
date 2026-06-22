@@ -28,7 +28,10 @@ pub struct RetryingDb {
 impl RetryingDb {
     /// Wrap an inner database with transient-error retry.
     pub fn wrap(inner: Arc<dyn SystemDatabase>) -> Arc<dyn SystemDatabase> {
-        Arc::new(Self { inner, max_elapsed: Duration::from_secs(120) })
+        Arc::new(Self {
+            inner,
+            max_elapsed: Duration::from_secs(120),
+        })
     }
 }
 
@@ -95,7 +98,10 @@ impl SystemDatabase for RetryingDb {
         &self,
         input: InsertWorkflowStatusInput,
     ) -> Result<InsertWorkflowResult, DbosError> {
-        retry(self.max_elapsed, || self.inner.insert_workflow_status(input.clone())).await
+        retry(self.max_elapsed, || {
+            self.inner.insert_workflow_status(input.clone())
+        })
+        .await
     }
     async fn update_workflow_outcome(
         &self,
@@ -105,7 +111,8 @@ impl SystemDatabase for RetryingDb {
         err_str: &str,
     ) -> Result<(), DbosError> {
         retry(self.max_elapsed, || {
-            self.inner.update_workflow_outcome(workflow_id, status, output, err_str)
+            self.inner
+                .update_workflow_outcome(workflow_id, status, output, err_str)
         })
         .await
     }
@@ -113,14 +120,20 @@ impl SystemDatabase for RetryingDb {
         &self,
         input: RecordOperationResultInput,
     ) -> Result<(), DbosError> {
-        retry(self.max_elapsed, || self.inner.record_operation_result(input.clone())).await
+        retry(self.max_elapsed, || {
+            self.inner.record_operation_result(input.clone())
+        })
+        .await
     }
     async fn check_child_workflow(
         &self,
         parent_workflow_id: &str,
         step_id: i64,
     ) -> Result<Option<String>, DbosError> {
-        retry(self.max_elapsed, || self.inner.check_child_workflow(parent_workflow_id, step_id)).await
+        retry(self.max_elapsed, || {
+            self.inner.check_child_workflow(parent_workflow_id, step_id)
+        })
+        .await
     }
     async fn check_operation_execution(
         &self,
@@ -129,7 +142,8 @@ impl SystemDatabase for RetryingDb {
         step_name: &str,
     ) -> Result<Option<RecordedResult>, DbosError> {
         retry(self.max_elapsed, || {
-            self.inner.check_operation_execution(workflow_id, step_id, step_name)
+            self.inner
+                .check_operation_execution(workflow_id, step_id, step_name)
         })
         .await
     }
@@ -137,32 +151,50 @@ impl SystemDatabase for RetryingDb {
         &self,
         input: ListWorkflowsInput,
     ) -> Result<Vec<WorkflowStatus>, DbosError> {
-        retry(self.max_elapsed, || self.inner.list_workflows(input.clone())).await
+        retry(self.max_elapsed, || {
+            self.inner.list_workflows(input.clone())
+        })
+        .await
     }
     async fn get_workflow_status(
         &self,
         workflow_id: &str,
     ) -> Result<Option<WorkflowStatus>, DbosError> {
-        retry(self.max_elapsed, || self.inner.get_workflow_status(workflow_id)).await
+        retry(self.max_elapsed, || {
+            self.inner.get_workflow_status(workflow_id)
+        })
+        .await
     }
     async fn await_workflow_result(
         &self,
         workflow_id: &str,
         poll_interval: Duration,
     ) -> Result<AwaitResult, DbosError> {
-        retry(self.max_elapsed, || self.inner.await_workflow_result(workflow_id, poll_interval)).await
+        retry(self.max_elapsed, || {
+            self.inner.await_workflow_result(workflow_id, poll_interval)
+        })
+        .await
     }
     async fn clear_queue_assignment(&self, workflow_id: &str) -> Result<bool, DbosError> {
-        retry(self.max_elapsed, || self.inner.clear_queue_assignment(workflow_id)).await
+        retry(self.max_elapsed, || {
+            self.inner.clear_queue_assignment(workflow_id)
+        })
+        .await
     }
     async fn dequeue_workflows(
         &self,
         input: DequeueInput,
     ) -> Result<Vec<DequeuedWorkflow>, DbosError> {
-        retry(self.max_elapsed, || self.inner.dequeue_workflows(input.clone())).await
+        retry(self.max_elapsed, || {
+            self.inner.dequeue_workflows(input.clone())
+        })
+        .await
     }
     async fn transition_delayed_workflows(&self) -> Result<(), DbosError> {
-        retry(self.max_elapsed, || self.inner.transition_delayed_workflows()).await
+        retry(self.max_elapsed, || {
+            self.inner.transition_delayed_workflows()
+        })
+        .await
     }
     async fn get_deduplicated_workflow(
         &self,
@@ -170,7 +202,8 @@ impl SystemDatabase for RetryingDb {
         deduplication_id: &str,
     ) -> Result<Option<String>, DbosError> {
         retry(self.max_elapsed, || {
-            self.inner.get_deduplicated_workflow(queue_name, deduplication_id)
+            self.inner
+                .get_deduplicated_workflow(queue_name, deduplication_id)
         })
         .await
     }
@@ -184,10 +217,16 @@ impl SystemDatabase for RetryingDb {
         retry(self.max_elapsed, || self.inner.delete_workflow(workflow_id)).await
     }
     async fn get_workflow_children(&self, workflow_id: &str) -> Result<Vec<String>, DbosError> {
-        retry(self.max_elapsed, || self.inner.get_workflow_children(workflow_id)).await
+        retry(self.max_elapsed, || {
+            self.inner.get_workflow_children(workflow_id)
+        })
+        .await
     }
     async fn get_workflow_steps(&self, workflow_id: &str) -> Result<Vec<StepInfo>, DbosError> {
-        retry(self.max_elapsed, || self.inner.get_workflow_steps(workflow_id)).await
+        retry(self.max_elapsed, || {
+            self.inner.get_workflow_steps(workflow_id)
+        })
+        .await
     }
     async fn fork_workflow(&self, input: ForkInput) -> Result<String, DbosError> {
         retry(self.max_elapsed, || self.inner.fork_workflow(input.clone())).await
@@ -200,10 +239,16 @@ impl SystemDatabase for RetryingDb {
         cutoff_epoch_ms: Option<i64>,
         rows_threshold: Option<i64>,
     ) -> Result<u64, DbosError> {
-        retry(self.max_elapsed, || self.inner.garbage_collect(cutoff_epoch_ms, rows_threshold)).await
+        retry(self.max_elapsed, || {
+            self.inner.garbage_collect(cutoff_epoch_ms, rows_threshold)
+        })
+        .await
     }
     async fn set_workflow_status_pending(&self, workflow_id: &str) -> Result<(), DbosError> {
-        retry(self.max_elapsed, || self.inner.set_workflow_status_pending(workflow_id)).await
+        retry(self.max_elapsed, || {
+            self.inner.set_workflow_status_pending(workflow_id)
+        })
+        .await
     }
     async fn send_notification(
         &self,
@@ -212,22 +257,31 @@ impl SystemDatabase for RetryingDb {
         message: &Option<String>,
         serialization: &str,
     ) -> Result<(), DbosError> {
-        retry(self.max_elapsed, || self.inner.send_notification(dest, topic, message, serialization))
-            .await
+        retry(self.max_elapsed, || {
+            self.inner
+                .send_notification(dest, topic, message, serialization)
+        })
+        .await
     }
     async fn has_unconsumed_notification(
         &self,
         dest: &str,
         topic: &str,
     ) -> Result<bool, DbosError> {
-        retry(self.max_elapsed, || self.inner.has_unconsumed_notification(dest, topic)).await
+        retry(self.max_elapsed, || {
+            self.inner.has_unconsumed_notification(dest, topic)
+        })
+        .await
     }
     async fn consume_oldest_notification(
         &self,
         dest: &str,
         topic: &str,
     ) -> Result<Option<(Option<String>, String)>, DbosError> {
-        retry(self.max_elapsed, || self.inner.consume_oldest_notification(dest, topic)).await
+        retry(self.max_elapsed, || {
+            self.inner.consume_oldest_notification(dest, topic)
+        })
+        .await
     }
     async fn set_event(
         &self,
@@ -238,7 +292,8 @@ impl SystemDatabase for RetryingDb {
         serialization: &str,
     ) -> Result<(), DbosError> {
         retry(self.max_elapsed, || {
-            self.inner.set_event(workflow_id, function_id, key, value, serialization)
+            self.inner
+                .set_event(workflow_id, function_id, key, value, serialization)
         })
         .await
     }
@@ -247,7 +302,10 @@ impl SystemDatabase for RetryingDb {
         target_workflow_id: &str,
         key: &str,
     ) -> Result<Option<(Option<String>, String)>, DbosError> {
-        retry(self.max_elapsed, || self.inner.get_event(target_workflow_id, key)).await
+        retry(self.max_elapsed, || {
+            self.inner.get_event(target_workflow_id, key)
+        })
+        .await
     }
     async fn write_stream(
         &self,
@@ -258,7 +316,8 @@ impl SystemDatabase for RetryingDb {
         serialization: &str,
     ) -> Result<(), DbosError> {
         retry(self.max_elapsed, || {
-            self.inner.write_stream(workflow_id, key, value, function_id, serialization)
+            self.inner
+                .write_stream(workflow_id, key, value, function_id, serialization)
         })
         .await
     }
@@ -268,31 +327,49 @@ impl SystemDatabase for RetryingDb {
         key: &str,
         from_offset: i64,
     ) -> Result<(Vec<(String, i64, String)>, bool), DbosError> {
-        retry(self.max_elapsed, || self.inner.read_stream(workflow_id, key, from_offset)).await
+        retry(self.max_elapsed, || {
+            self.inner.read_stream(workflow_id, key, from_offset)
+        })
+        .await
     }
     async fn create_application_version(&self, version_name: &str) -> Result<(), DbosError> {
-        retry(self.max_elapsed, || self.inner.create_application_version(version_name)).await
+        retry(self.max_elapsed, || {
+            self.inner.create_application_version(version_name)
+        })
+        .await
     }
     async fn get_latest_application_version(&self) -> Result<Option<String>, DbosError> {
-        retry(self.max_elapsed, || self.inner.get_latest_application_version()).await
+        retry(self.max_elapsed, || {
+            self.inner.get_latest_application_version()
+        })
+        .await
     }
     async fn get_workflow_events(
         &self,
         workflow_id: &str,
     ) -> Result<Vec<(String, Option<String>, String)>, DbosError> {
-        retry(self.max_elapsed, || self.inner.get_workflow_events(workflow_id)).await
+        retry(self.max_elapsed, || {
+            self.inner.get_workflow_events(workflow_id)
+        })
+        .await
     }
     async fn get_workflow_notifications(
         &self,
         workflow_id: &str,
     ) -> Result<Vec<(String, Option<String>, i64, String, bool)>, DbosError> {
-        retry(self.max_elapsed, || self.inner.get_workflow_notifications(workflow_id)).await
+        retry(self.max_elapsed, || {
+            self.inner.get_workflow_notifications(workflow_id)
+        })
+        .await
     }
     async fn get_workflow_streams(
         &self,
         workflow_id: &str,
     ) -> Result<Vec<(String, i64, String, String)>, DbosError> {
-        retry(self.max_elapsed, || self.inner.get_workflow_streams(workflow_id)).await
+        retry(self.max_elapsed, || {
+            self.inner.get_workflow_streams(workflow_id)
+        })
+        .await
     }
     async fn get_step_aggregates(&self) -> Result<Vec<(String, i64)>, DbosError> {
         retry(self.max_elapsed, || self.inner.get_step_aggregates()).await
@@ -302,11 +379,11 @@ impl SystemDatabase for RetryingDb {
     ) -> Result<Vec<(String, String, i64, i64)>, DbosError> {
         retry(self.max_elapsed, || self.inner.list_application_versions()).await
     }
-    async fn set_latest_application_version(
-        &self,
-        version_name: &str,
-    ) -> Result<(), DbosError> {
-        retry(self.max_elapsed, || self.inner.set_latest_application_version(version_name)).await
+    async fn set_latest_application_version(&self, version_name: &str) -> Result<(), DbosError> {
+        retry(self.max_elapsed, || {
+            self.inner.set_latest_application_version(version_name)
+        })
+        .await
     }
     async fn create_schedule(&self, row: ScheduleRow) -> Result<(), DbosError> {
         retry(self.max_elapsed, || self.inner.create_schedule(row.clone())).await
@@ -318,14 +395,20 @@ impl SystemDatabase for RetryingDb {
         retry(self.max_elapsed, || self.inner.get_schedule(name)).await
     }
     async fn set_schedule_status(&self, name: &str, status: &str) -> Result<(), DbosError> {
-        retry(self.max_elapsed, || self.inner.set_schedule_status(name, status)).await
+        retry(self.max_elapsed, || {
+            self.inner.set_schedule_status(name, status)
+        })
+        .await
     }
     async fn update_schedule_last_fired(
         &self,
         name: &str,
         last_fired_at: &str,
     ) -> Result<(), DbosError> {
-        retry(self.max_elapsed, || self.inner.update_schedule_last_fired(name, last_fired_at)).await
+        retry(self.max_elapsed, || {
+            self.inner.update_schedule_last_fired(name, last_fired_at)
+        })
+        .await
     }
     async fn delete_schedule(&self, name: &str) -> Result<(), DbosError> {
         retry(self.max_elapsed, || self.inner.delete_schedule(name)).await

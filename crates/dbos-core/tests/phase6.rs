@@ -13,10 +13,12 @@ use dbos::{
 };
 
 async fn cancellable(ctx: WfCtx, _: ()) -> Result<i32, DbosError> {
-    ctx.run_step("s1", |_s| async move { Ok::<i32, DbosError>(1) }).await?;
+    ctx.run_step("s1", |_s| async move { Ok::<i32, DbosError>(1) })
+        .await?;
     ctx.sleep(Duration::from_millis(500)).await?;
     // After a cancel, this step's check sees status CANCELLED and aborts.
-    ctx.run_step("s2", |_s| async move { Ok::<i32, DbosError>(2) }).await
+    ctx.run_step("s2", |_s| async move { Ok::<i32, DbosError>(2) })
+        .await
 }
 
 #[tokio::test]
@@ -29,7 +31,10 @@ async fn cancel_aborts_at_next_step() {
         &ctx,
         "cancellable",
         (),
-        RunOptions { workflow_id: Some("cancel-1".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("cancel-1".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
@@ -38,8 +43,16 @@ async fn cancel_aborts_at_next_step() {
     dbos::cancel_workflow(&ctx, "cancel-1").await.unwrap();
 
     let err = h.get_result().await.unwrap_err();
-    assert!(err.is_code(dbos::DbosErrorCode::WorkflowCancelled), "got {err}");
-    let st = ctx.system_database().get_workflow_status("cancel-1").await.unwrap().unwrap();
+    assert!(
+        err.is_code(dbos::DbosErrorCode::WorkflowCancelled),
+        "got {err}"
+    );
+    let st = ctx
+        .system_database()
+        .get_workflow_status("cancel-1")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(st.status, WorkflowStatusType::Cancelled);
 
     ctx.shutdown(Duration::from_secs(5)).await;
@@ -55,7 +68,10 @@ async fn resume_reenqueues_and_completes() {
         &ctx,
         "cancellable",
         (),
-        RunOptions { workflow_id: Some("resume-1".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("resume-1".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
@@ -64,7 +80,9 @@ async fn resume_reenqueues_and_completes() {
     assert!(h.get_result().await.is_err());
 
     // Resume: re-enqueued on the internal queue, steps replayed, runs to success.
-    let rh = dbos::resume_workflow::<i32>(&ctx, "resume-1").await.unwrap();
+    let rh = dbos::resume_workflow::<i32>(&ctx, "resume-1")
+        .await
+        .unwrap();
     assert_eq!(rh.get_result().await.unwrap(), 2);
 
     ctx.shutdown(Duration::from_secs(5)).await;
@@ -82,7 +100,10 @@ async fn fork_copies_prior_steps() {
         &ctx,
         "two_step",
         10,
-        RunOptions { workflow_id: Some("fork-orig".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("fork-orig".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
@@ -92,7 +113,11 @@ async fn fork_copies_prior_steps() {
     // Fork from step 1: step 0 is copied (not re-run), step 1 re-runs.
     let fh = dbos::fork_workflow::<i32>(
         &ctx,
-        ForkOptions { original_workflow_id: "fork-orig".into(), start_step: 1, ..Default::default() },
+        ForkOptions {
+            original_workflow_id: "fork-orig".into(),
+            start_step: 1,
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
@@ -100,7 +125,12 @@ async fn fork_copies_prior_steps() {
     // Only step 1 re-ran -> counter incremented by exactly 1.
     assert_eq!(counter.load(Ordering::SeqCst), 3);
 
-    let orig = ctx.system_database().get_workflow_status("fork-orig").await.unwrap().unwrap();
+    let orig = ctx
+        .system_database()
+        .get_workflow_status("fork-orig")
+        .await
+        .unwrap()
+        .unwrap();
     assert!(orig.was_forked_from);
     ctx.shutdown(Duration::from_secs(5)).await;
 }
@@ -109,22 +139,38 @@ async fn fork_copies_prior_steps() {
 async fn delete_removes_workflow() {
     let counter = Arc::new(AtomicUsize::new(0));
     let ctx = new_ctx("p6-delete").await;
-    dbos::register_workflow::<i32, i32, _, _>(&ctx, "two_step", counting_two_step(counter)).unwrap();
+    dbos::register_workflow::<i32, i32, _, _>(&ctx, "two_step", counting_two_step(counter))
+        .unwrap();
     ctx.launch().await.unwrap();
 
     let h = dbos::run_workflow::<i32, i32>(
         &ctx,
         "two_step",
         1,
-        RunOptions { workflow_id: Some("del-1".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("del-1".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
     h.get_result().await.unwrap();
-    assert!(ctx.system_database().get_workflow_status("del-1").await.unwrap().is_some());
+    assert!(
+        ctx.system_database()
+            .get_workflow_status("del-1")
+            .await
+            .unwrap()
+            .is_some()
+    );
 
     dbos::delete_workflow(&ctx, "del-1", false).await.unwrap();
-    assert!(ctx.system_database().get_workflow_status("del-1").await.unwrap().is_none());
+    assert!(
+        ctx.system_database()
+            .get_workflow_status("del-1")
+            .await
+            .unwrap()
+            .is_none()
+    );
 
     ctx.shutdown(Duration::from_secs(5)).await;
 }
@@ -133,7 +179,8 @@ async fn delete_removes_workflow() {
 async fn list_workflows_and_steps() {
     let counter = Arc::new(AtomicUsize::new(0));
     let ctx = new_ctx("p6-list").await;
-    dbos::register_workflow::<i32, i32, _, _>(&ctx, "two_step", counting_two_step(counter)).unwrap();
+    dbos::register_workflow::<i32, i32, _, _>(&ctx, "two_step", counting_two_step(counter))
+        .unwrap();
     ctx.launch().await.unwrap();
 
     for i in 0..3 {
@@ -141,7 +188,10 @@ async fn list_workflows_and_steps() {
             &ctx,
             "two_step",
             i,
-            RunOptions { workflow_id: Some(format!("list-{i}")), ..Default::default() },
+            RunOptions {
+                workflow_id: Some(format!("list-{i}")),
+                ..Default::default()
+            },
         )
         .await
         .unwrap();
@@ -150,7 +200,10 @@ async fn list_workflows_and_steps() {
 
     let all = dbos::list_workflows(
         &ctx,
-        ListWorkflowsInput { workflow_name: vec!["two_step".into()], ..Default::default() },
+        ListWorkflowsInput {
+            workflow_name: vec!["two_step".into()],
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
@@ -172,7 +225,11 @@ async fn client_enqueue_to_server() {
     // Server: registers the workflow + runs the queue runner.
     let server = new_ctx_from_url("p6-client-server", &url).await;
     async fn doubler(ctx: WfCtx, x: i32) -> Result<i32, DbosError> {
-        ctx.run_step("double", move |_s| async move { Ok::<i32, DbosError>(x * 2) }).await
+        ctx.run_step(
+            "double",
+            move |_s| async move { Ok::<i32, DbosError>(x * 2) },
+        )
+        .await
     }
     dbos::register_queue(&server, "work", QueueOptions::default()).unwrap();
     dbos::register_workflow::<i32, i32, _, _>(&server, "doubler", doubler).unwrap();

@@ -25,7 +25,10 @@ async fn write_read_and_close_stream() {
         &ctx,
         "producer",
         5,
-        RunOptions { workflow_id: Some("stream-1".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("stream-1".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
@@ -49,20 +52,32 @@ async fn stream_writes_are_idempotent_on_recovery() {
         &ctx,
         "producer",
         3,
-        RunOptions { workflow_id: Some("stream-rec".into()), ..Default::default() },
+        RunOptions {
+            workflow_id: Some("stream-rec".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
     assert_eq!(h.get_result().await.unwrap(), 3);
 
     // Recover: stream writes are memoized steps, so no duplicate entries appear.
-    ctx.system_database().set_workflow_status_pending("stream-rec").await.unwrap();
-    let handles = dbos::recover_pending_workflows(&ctx, &["local"]).await.unwrap();
+    ctx.system_database()
+        .set_workflow_status_pending("stream-rec")
+        .await
+        .unwrap();
+    let handles = dbos::recover_pending_workflows(&ctx, &["local"])
+        .await
+        .unwrap();
     assert_eq!(handles[0].get_result().await.unwrap(), serde_json::json!(3));
 
     let (values, closed): (Vec<i32>, bool) =
         dbos::read_stream(&ctx, "stream-rec", "nums").await.unwrap();
-    assert_eq!(values, vec![0, 1, 2], "recovery must not duplicate stream entries");
+    assert_eq!(
+        values,
+        vec![0, 1, 2],
+        "recovery must not duplicate stream entries"
+    );
     assert!(closed);
 
     ctx.shutdown(Duration::from_secs(5)).await;
@@ -82,7 +97,9 @@ async fn writing_to_closed_stream_fails() {
     }
     dbos::register_workflow::<(), i32, _, _>(&ctx, "bad", bad).unwrap();
     ctx.launch().await.unwrap();
-    let h = dbos::run_workflow::<(), i32>(&ctx, "bad", (), RunOptions::default()).await.unwrap();
+    let h = dbos::run_workflow::<(), i32>(&ctx, "bad", (), RunOptions::default())
+        .await
+        .unwrap();
     assert_eq!(h.get_result().await.unwrap(), 1);
     ctx.shutdown(Duration::from_secs(5)).await;
 }

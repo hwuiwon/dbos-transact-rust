@@ -11,7 +11,11 @@ use dbos::{DbosError, QueueOptions, RateLimiter, RunOptions, WfCtx};
 use futures::future::BoxFuture;
 
 async fn doubler(ctx: WfCtx, x: i32) -> Result<i32, DbosError> {
-    ctx.run_step("double", move |_s| async move { Ok::<i32, DbosError>(x * 2) }).await
+    ctx.run_step(
+        "double",
+        move |_s| async move { Ok::<i32, DbosError>(x * 2) },
+    )
+    .await
 }
 
 #[tokio::test]
@@ -25,7 +29,10 @@ async fn enqueue_runs_via_queue_runner() {
         &ctx,
         "doubler",
         21,
-        RunOptions { queue: Some("work".into()), ..Default::default() },
+        RunOptions {
+            queue: Some("work".into()),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
@@ -50,7 +57,10 @@ async fn enqueue_many_all_complete() {
                 &ctx,
                 "doubler",
                 i,
-                RunOptions { queue: Some("work".into()), ..Default::default() },
+                RunOptions {
+                    queue: Some("work".into()),
+                    ..Default::default()
+                },
             )
             .await
             .unwrap(),
@@ -68,7 +78,10 @@ async fn global_concurrency_one_serializes_execution() {
     dbos::register_queue(
         &ctx,
         "limited",
-        QueueOptions { global_concurrency: Some(1), ..Default::default() },
+        QueueOptions {
+            global_concurrency: Some(1),
+            ..Default::default()
+        },
     )
     .unwrap();
 
@@ -107,7 +120,10 @@ async fn global_concurrency_one_serializes_execution() {
                 &ctx,
                 "tracker",
                 i,
-                RunOptions { queue: Some("limited".into()), ..Default::default() },
+                RunOptions {
+                    queue: Some("limited".into()),
+                    ..Default::default()
+                },
             )
             .await
             .unwrap(),
@@ -116,7 +132,11 @@ async fn global_concurrency_one_serializes_execution() {
     for h in handles {
         h.get_result().await.unwrap();
     }
-    assert_eq!(max_seen.load(Ordering::SeqCst), 1, "global concurrency 1 must serialize");
+    assert_eq!(
+        max_seen.load(Ordering::SeqCst),
+        1,
+        "global concurrency 1 must serialize"
+    );
     ctx.shutdown(Duration::from_secs(5)).await;
 }
 
@@ -127,7 +147,10 @@ async fn rate_limited_queue_eventually_completes() {
         &ctx,
         "rl",
         QueueOptions {
-            rate_limit: Some(RateLimiter { limit: 2, period: Duration::from_millis(200) }),
+            rate_limit: Some(RateLimiter {
+                limit: 2,
+                period: Duration::from_millis(200),
+            }),
             ..Default::default()
         },
     )
@@ -142,7 +165,10 @@ async fn rate_limited_queue_eventually_completes() {
                 &ctx,
                 "doubler",
                 i,
-                RunOptions { queue: Some("rl".into()), ..Default::default() },
+                RunOptions {
+                    queue: Some("rl".into()),
+                    ..Default::default()
+                },
             )
             .await
             .unwrap(),
@@ -175,7 +201,10 @@ async fn delayed_workflow_runs_after_delay() {
     .await
     .unwrap();
     assert_eq!(h.get_result().await.unwrap(), 10);
-    assert!(started.elapsed() >= Duration::from_millis(250), "should respect the delay");
+    assert!(
+        started.elapsed() >= Duration::from_millis(250),
+        "should respect the delay"
+    );
     ctx.shutdown(Duration::from_secs(5)).await;
 }
 
@@ -188,7 +217,10 @@ async fn delay_without_queue_is_rejected() {
         &ctx,
         "doubler",
         5,
-        RunOptions { delay: Some(Duration::from_millis(100)), ..Default::default() },
+        RunOptions {
+            delay: Some(Duration::from_millis(100)),
+            ..Default::default()
+        },
     )
     .await;
     assert!(res.is_err());

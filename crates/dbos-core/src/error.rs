@@ -109,10 +109,7 @@ impl DbosError {
     }
 
     /// Attach a wrapped source error (for `source()` / unwrapping).
-    pub fn with_source(
-        mut self,
-        err: impl std::error::Error + Send + Sync + 'static,
-    ) -> Self {
+    pub fn with_source(mut self, err: impl std::error::Error + Send + Sync + 'static) -> Self {
         self.source = Some(Arc::new(err));
         self
     }
@@ -377,7 +374,10 @@ impl DbosError {
     }
 
     pub fn no_application_versions() -> Self {
-        Self::new(DbosErrorCode::NoApplicationVersions, "No application versions are registered")
+        Self::new(
+            DbosErrorCode::NoApplicationVersions,
+            "No application versions are registered",
+        )
     }
 
     pub fn timeout(

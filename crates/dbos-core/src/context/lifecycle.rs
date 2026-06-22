@@ -5,8 +5,8 @@
 //! conductor are wired in here in later phases.
 
 use std::collections::HashMap;
-use std::sync::RwLock;
 use std::sync::Arc;
+use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -74,7 +74,11 @@ impl DbosContext {
 
         self.db.run_migrations().await?;
 
-        if let Err(e) = self.db.create_application_version(self.application_version()).await {
+        if let Err(e) = self
+            .db
+            .create_application_version(self.application_version())
+            .await
+        {
             tracing::warn!(error = %e, "failed to register application version");
         }
 
@@ -82,8 +86,10 @@ impl DbosContext {
         crate::queue::register_internal_queue(self);
         let runner_ctx = self.clone();
         let runner_token = self.token.child_token();
-        self.tracker
-            .spawn(crate::queue::runner::run_queue_runner(runner_ctx, runner_token));
+        self.tracker.spawn(crate::queue::runner::run_queue_runner(
+            runner_ctx,
+            runner_token,
+        ));
 
         // Start a firing task for each scheduled (cron) workflow.
         let scheduled: Vec<(String, String)> = self
@@ -96,15 +102,21 @@ impl DbosContext {
         for (name, cron) in scheduled {
             let sched_ctx = self.clone();
             let sched_token = self.token.child_token();
-            self.tracker
-                .spawn(crate::scheduler::engine::run_schedule(sched_ctx, sched_token, name, cron));
+            self.tracker.spawn(crate::scheduler::engine::run_schedule(
+                sched_ctx,
+                sched_token,
+                name,
+                cron,
+            ));
         }
 
         // Start the dynamic-schedule reconciler (DB-backed schedules).
         let recon_ctx = self.clone();
         let recon_token = self.token.child_token();
-        self.tracker
-            .spawn(crate::scheduler::engine::run_reconciler(recon_ctx, recon_token));
+        self.tracker.spawn(crate::scheduler::engine::run_reconciler(
+            recon_ctx,
+            recon_token,
+        ));
 
         // One recovery round for this executor's pending workflows.
         let executor = self.executor_id().to_string();
@@ -122,7 +134,10 @@ impl DbosContext {
     pub async fn shutdown(self: &Arc<Self>, timeout: Duration) {
         self.token.cancel();
         self.tracker.close();
-        if tokio::time::timeout(timeout, self.tracker.wait()).await.is_err() {
+        if tokio::time::timeout(timeout, self.tracker.wait())
+            .await
+            .is_err()
+        {
             tracing::warn!("shutdown timed out waiting for in-flight workflows to drain");
         }
         self.db.close().await;
