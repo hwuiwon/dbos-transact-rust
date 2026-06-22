@@ -3,7 +3,7 @@
 mod common;
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
 use common::{counting_two_step, new_ctx, new_ctx_from_url, shared_db_url};
@@ -11,20 +11,52 @@ use dbos::{
     Client, ClientConfig, DbosError, EnqueueOptions, ForkOptions, ListWorkflowsInput, QueueOptions,
     RunOptions, WfCtx, WorkflowStatusType,
 };
+use futures::future::BoxFuture;
 
-async fn cancellable(ctx: WfCtx, _: ()) -> Result<i32, DbosError> {
-    ctx.run_step("s1", |_s| async move { Ok::<i32, DbosError>(1) })
-        .await?;
-    ctx.sleep(Duration::from_millis(500)).await?;
-    // After a cancel, this step's check sees status CANCELLED and aborts.
-    ctx.run_step("s2", |_s| async move { Ok::<i32, DbosError>(2) })
-        .await
+/// A workflow that runs `s1` (flipping `started`), then sleeps for a generous
+/// window, then runs `s2`. The long sleep is the cancellation window: a test
+/// that cancels after observing `started` reliably lands the cancel before `s2`
+/// runs, regardless of scheduling jitter on a loaded CI machine.
+fn cancellable_wf(
+    started: Arc<AtomicBool>,
+) -> impl Fn(WfCtx, ()) -> BoxFuture<'static, Result<i32, DbosError>> + Clone + Send + Sync + 'static
+{
+    move |ctx: WfCtx, _: ()| {
+        let started = started.clone();
+        Box::pin(async move {
+            ctx.run_step("s1", move |_s| {
+                let started = started.clone();
+                async move {
+                    started.store(true, Ordering::SeqCst);
+                    Ok::<i32, DbosError>(1)
+                }
+            })
+            .await?;
+            ctx.sleep(Duration::from_millis(2000)).await?;
+            // After a cancel, this step's check sees status CANCELLED and aborts.
+            ctx.run_step("s2", |_s| async move { Ok::<i32, DbosError>(2) })
+                .await
+        })
+    }
+}
+
+/// Wait until the workflow's first step has run (bounded).
+async fn wait_started(started: &Arc<AtomicBool>) {
+    for _ in 0..400 {
+        if started.load(Ordering::SeqCst) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("workflow did not start within the timeout");
 }
 
 #[tokio::test]
 async fn cancel_aborts_at_next_step() {
+    let started = Arc::new(AtomicBool::new(false));
     let ctx = new_ctx("p6-cancel").await;
-    dbos::register_workflow::<(), i32, _, _>(&ctx, "cancellable", cancellable).unwrap();
+    dbos::register_workflow::<(), i32, _, _>(&ctx, "cancellable", cancellable_wf(started.clone()))
+        .unwrap();
     ctx.launch().await.unwrap();
 
     let h = dbos::run_workflow::<(), i32>(
@@ -38,8 +70,8 @@ async fn cancel_aborts_at_next_step() {
     )
     .await
     .unwrap();
-    // Cancel while it is sleeping between s1 and s2.
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    // Cancel once it has started and is in its sleep window (before s2).
+    wait_started(&started).await;
     dbos::cancel_workflow(&ctx, "cancel-1").await.unwrap();
 
     let err = h.get_result().await.unwrap_err();
@@ -60,8 +92,10 @@ async fn cancel_aborts_at_next_step() {
 
 #[tokio::test]
 async fn resume_reenqueues_and_completes() {
+    let started = Arc::new(AtomicBool::new(false));
     let ctx = new_ctx("p6-resume").await;
-    dbos::register_workflow::<(), i32, _, _>(&ctx, "cancellable", cancellable).unwrap();
+    dbos::register_workflow::<(), i32, _, _>(&ctx, "cancellable", cancellable_wf(started.clone()))
+        .unwrap();
     ctx.launch().await.unwrap();
 
     let h = dbos::run_workflow::<(), i32>(
@@ -75,11 +109,21 @@ async fn resume_reenqueues_and_completes() {
     )
     .await
     .unwrap();
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    wait_started(&started).await;
     dbos::cancel_workflow(&ctx, "resume-1").await.unwrap();
-    assert!(h.get_result().await.is_err());
 
-    // Resume: re-enqueued on the internal queue, steps replayed, runs to success.
+    // The cancel landed while the workflow was sleeping, so it is now CANCELLED.
+    let st = ctx
+        .system_database()
+        .get_workflow_status("resume-1")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(st.status, WorkflowStatusType::Cancelled);
+
+    // Let the original run finish (it aborts at s2) so there is no overlap, then
+    // resume: re-enqueued on the internal queue, steps replayed, runs to success.
+    let _ = h.get_result().await;
     let rh = dbos::resume_workflow::<i32>(&ctx, "resume-1")
         .await
         .unwrap();
