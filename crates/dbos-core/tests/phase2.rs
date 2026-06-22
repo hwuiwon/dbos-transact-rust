@@ -144,11 +144,17 @@ async fn durable_sleep_replays_remaining_time() {
     .await
     .unwrap();
     let first = h.get_result().await.unwrap();
+    // The first run waits ~the full duration in wall-clock time. (The *returned*
+    // remaining can be less than the duration if recording the wake time was slow,
+    // e.g. on a remote database, so we assert on elapsed wall-clock, not `first`.)
     assert!(
-        first >= 250,
-        "first run should sleep ~full duration, got {first}"
+        first > 0,
+        "first run should report a positive remaining, got {first}"
     );
-    assert!(started.elapsed() >= Duration::from_millis(250));
+    assert!(
+        started.elapsed() >= Duration::from_millis(250),
+        "first run should sleep ~full duration"
+    );
 
     // After completion the wake time is in the past; recovery replays sleep as ~0.
     ctx.system_database()
